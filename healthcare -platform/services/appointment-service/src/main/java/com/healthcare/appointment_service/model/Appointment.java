@@ -1,3 +1,5 @@
+//healthcare-microservices-system/healthcare/services/appointment-service/src/main/java/com.healthcare.appointment_service/model/Appointment
+
 package com.healthcare.appointment_service.model;
 
 import lombok.*;
