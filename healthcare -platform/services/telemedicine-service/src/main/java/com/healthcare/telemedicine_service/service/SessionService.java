@@ -4,6 +4,7 @@ import com.healthcare.telemedicine_service.dto.SessionRequest;
 import com.healthcare.telemedicine_service.model.VideoSession;
 import com.healthcare.telemedicine_service.repository.VideoSessionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +16,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SessionService {
 
-    private final VideoSessionRepository sessionRepository;
+    @Autowired
+    private VideoSessionRepository sessionRepository;
 
     @Value("${jitsi.base-url}")
     private String jitsiBaseUrl;

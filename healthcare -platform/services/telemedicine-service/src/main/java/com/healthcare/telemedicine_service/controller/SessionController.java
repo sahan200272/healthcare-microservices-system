@@ -4,7 +4,9 @@ import com.healthcare.telemedicine_service.dto.SessionRequest;
 import com.healthcare.telemedicine_service.model.VideoSession;
 import com.healthcare.telemedicine_service.service.SessionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,40 +17,41 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SessionController {
 
-    private final SessionService sessionService;
+    @Autowired
+    private SessionService sessionService;
 
-    // Create session (called when appointment is confirmed)
     @PostMapping("/create")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'PATIENT')")
     public ResponseEntity<VideoSession> createSession(@RequestBody SessionRequest request) {
         return ResponseEntity.ok(sessionService.createSession(request));
     }
 
-    // Get session by appointment
     @GetMapping("/appointment/{appointmentId}")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'PATIENT', 'ADMIN')")
     public ResponseEntity<VideoSession> getByAppointment(@PathVariable String appointmentId) {
         return ResponseEntity.ok(sessionService.getSessionByAppointment(appointmentId));
     }
 
-    // Start session
     @PutMapping("/{sessionId}/start")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<VideoSession> startSession(@PathVariable String sessionId) {
         return ResponseEntity.ok(sessionService.startSession(sessionId));
     }
 
-    // End session
     @PutMapping("/{sessionId}/end")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<VideoSession> endSession(@PathVariable String sessionId) {
         return ResponseEntity.ok(sessionService.endSession(sessionId));
     }
 
-    // Get all sessions for a patient
     @GetMapping("/patient/{patientId}")
+    @PreAuthorize("hasRole('PATIENT')")
     public ResponseEntity<List<VideoSession>> getPatientSessions(@PathVariable String patientId) {
         return ResponseEntity.ok(sessionService.getPatientSessions(patientId));
     }
 
-    // Get all sessions for a doctor
     @GetMapping("/doctor/{doctorId}")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<List<VideoSession>> getDoctorSessions(@PathVariable String doctorId) {
         return ResponseEntity.ok(sessionService.getDoctorSessions(doctorId));
     }
