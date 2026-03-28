@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+
+  api-gateway:
+    build: ./healthcare-platform/services/api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - JWT_SECRET=your_super_secret_key_make_it_long_and_random
+    depends_on: #Ensures these services start before gateway
+      - auth-service
+      - telemedicine-service
+
+  auth-service:
+    build: ./healthcare-platform/services/auth-service
+    ports:
+      - "8088:8088"
+    environment:
+      - MONGO_URI=mongodb+srv://sahan_munasingha:sah123@smart-health-cluster.vvmyavo.mongodb.net/authdbDB
+      - JWT_SECRET=your_super_secret_key_make_it_long_and_random
+
+  telemedicine-service:
+    build: ./healthcare-platform/services/telemedicine-service
+    ports:
+      - "8087:8087"
+    environment:
+      - MONGO_URI=mongodb+srv://sahan_munasingha:sah123@smart-health-cluster.vvmyavo.mongodb.net/telemedicineDB
+      - JWT_SECRET=your_super_secret_key_make_it_long_and_random
