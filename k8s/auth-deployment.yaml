@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          image: auth-service:latest
+          ports:
+            - containerPort: 8088
+          env:
+            - name: MONGO_URI
+              value: "mongodb+srv://sahan_munasingha:sah123@smart-health-cluster.vvmyavo.mongodb.net/authdbDB"
+            - name: JWT_SECRET
+              value: "your_super_secret_key_make_it_long_and_random"
