@@ -13,6 +13,15 @@
         <option value="$PROJECT_DIR$/healthcare -platform/services/payment-service/pom.xml" />
         <option value="$PROJECT_DIR$/healthcare -platform/services/telemedicine-service/pom.xml" />
         <option value="$PROJECT_DIR$/healthcare -platform/services/auth-service/pom.xml" />
+        <option value="$PROJECT_DIR$/healthcare-platform/services/ai-symptom-service/pom.xml" />
+        <option value="$PROJECT_DIR$/healthcare-platform/services/api-gateway/pom.xml" />
+        <option value="$PROJECT_DIR$/healthcare-platform/services/appointment-service/pom.xml" />
+        <option value="$PROJECT_DIR$/healthcare-platform/services/auth-service/pom.xml" />
+        <option value="$PROJECT_DIR$/healthcare-platform/services/doctor-service/pom.xml" />
+        <option value="$PROJECT_DIR$/healthcare-platform/services/notification-service/pom.xml" />
+        <option value="$PROJECT_DIR$/healthcare-platform/services/patient-service/pom.xml" />
+        <option value="$PROJECT_DIR$/healthcare-platform/services/payment-service/pom.xml" />
+        <option value="$PROJECT_DIR$/healthcare-platform/services/telemedicine-service/pom.xml" />
       </list>
     </option>
   </component>
