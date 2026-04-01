@@ -7,6 +7,7 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="api-gateway" />
       </profile>
       <profile name="Annotation profile for telemedicine-service" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
@@ -18,18 +19,13 @@
         <module name="auth-service" />
         <module name="payment-service" />
         <module name="appointment-service" />
+        <module name="doctor-service" />
+        <module name="patient-service" />
+        <module name="telemedicine-service" />
+        <module name="notification-service" />
+        <module name="ai-symptom-service" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
-      <module name="ai-symptom-service" target="21" />
-      <module name="api-gateway" target="21" />
-      <module name="auth-service" target="21" />
-      <module name="doctor-service" target="21" />
-      <module name="notification-service" target="21" />
-      <module name="patient-service" target="21" />
-      <module name="payment-service" target="21" />
-      <module name="telemedicine-service" target="21" />
-    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
