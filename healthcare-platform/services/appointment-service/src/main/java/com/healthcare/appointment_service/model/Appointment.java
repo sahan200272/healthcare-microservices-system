@@ -25,4 +25,5 @@ public class Appointment {
     private String status; // BOOKED, CANCELLED, COMPLETED
 
     private LocalDateTime createdAt;
+
 }
