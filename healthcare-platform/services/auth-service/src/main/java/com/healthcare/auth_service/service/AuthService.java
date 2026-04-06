@@ -27,14 +27,14 @@ public class AuthService {
 
     public String register(RegisterRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already exists");
+            throw new IllegalStateException("Email already exists");
         }
 
         User user = new User();
         user.setName(request.getName());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(request.getRole().toUpperCase());
+        user.setRole(normalizeRole(request.getRole()));
 
         userRepository.save(user);
         return "User registered successfully";
@@ -42,18 +42,36 @@ public class AuthService {
 
     public Map<String, String> login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Invalid password");
+            throw new IllegalArgumentException("Invalid password");
         }
 
-        String token = jwtUtil.generateToken(user.getEmail(), user.getRole());
+        String normalizedRole = normalizeRole(user.getRole());
+        String token = jwtUtil.generateToken(user.getEmail(), normalizedRole);
 
         return Map.of(
                 "token", token,
-                "role", user.getRole(),
+                "role", normalizedRole,
                 "name", user.getName()
         );
+    }
+
+    private String normalizeRole(String role) {
+        if (role == null || role.isBlank()) {
+            throw new IllegalArgumentException("Role is required");
+        }
+
+        String normalized = role.trim().toUpperCase();
+        if (normalized.startsWith("ROLE_")) {
+            normalized = normalized.substring("ROLE_".length());
+        }
+
+        if (!normalized.equals("PATIENT") && !normalized.equals("DOCTOR") && !normalized.equals("ADMIN")) {
+            throw new IllegalArgumentException("Invalid role. Allowed: PATIENT, DOCTOR, ADMIN");
+        }
+
+        return normalized;
     }
 }

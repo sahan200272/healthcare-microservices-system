@@ -3,6 +3,7 @@ package com.healthcare.appointment_service.security;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
@@ -28,6 +29,9 @@ public class SecurityConfig {
 
                         // DOCTOR actions
                         .requestMatchers("/api/appointments/doctor/**").hasRole("DOCTOR")
+
+                        // Inter-service: DOCTOR fetches a single appointment by ID
+                        .requestMatchers(HttpMethod.GET, "/api/appointments/*").hasAnyRole("DOCTOR", "ADMIN")
 
                         // ADMIN access
                         .requestMatchers("/api/appointments/**").hasRole("ADMIN")

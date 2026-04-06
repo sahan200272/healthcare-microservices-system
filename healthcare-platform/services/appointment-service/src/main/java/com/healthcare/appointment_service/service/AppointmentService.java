@@ -6,7 +6,9 @@ import com.healthcare.appointment_service.dto.AppointmentRequest;
 import com.healthcare.appointment_service.model.Appointment;
 import com.healthcare.appointment_service.repository.AppointmentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -48,6 +50,11 @@ public class AppointmentService {
         appointment.setCreatedAt(LocalDateTime.now());
 
         return appointmentRepository.save(appointment);
+    }
+
+    public Appointment getAppointmentById(String id) {
+        return appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Appointment not found: " + id));
     }
 
     public List<Appointment> getPatientAppointments(String patientId) {

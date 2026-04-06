@@ -5,6 +5,7 @@ import com.healthcare.patient_service.dto.PatientResponse;
 import com.healthcare.patient_service.service.PatientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,7 +17,8 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class PatientController {
 
-    private final PatientService patientService;
+    @Autowired
+    private PatientService patientService;
 
     @PostMapping
     @PreAuthorize("hasRole('PATIENT')")

@@ -6,6 +6,7 @@ import com.healthcare.appointment_service.dto.AppointmentRequest;
 import com.healthcare.appointment_service.model.Appointment;
 import com.healthcare.appointment_service.service.AppointmentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,7 +19,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AppointmentController {
 
-    private final AppointmentService appointmentService;
+    @Autowired
+    private AppointmentService appointmentService;
 
     @PreAuthorize("hasRole('PATIENT')")
     @PostMapping("/book")
@@ -36,6 +38,12 @@ public class AppointmentController {
     @GetMapping("/doctor/{doctorId}")
     public ResponseEntity<List<Appointment>> getDoctorAppointments(@PathVariable String doctorId) {
         return ResponseEntity.ok(appointmentService.getDoctorAppointments(doctorId));
+    }
+
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+    @GetMapping("/{id}")
+    public ResponseEntity<Appointment> getAppointmentById(@PathVariable String id) {
+        return ResponseEntity.ok(appointmentService.getAppointmentById(id));
     }
 
     @PreAuthorize("hasRole('PATIENT')")
