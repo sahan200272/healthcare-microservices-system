@@ -1,0 +1,115 @@
+package com.healthcare.doctor_service.controller;
+
+import com.healthcare.doctor_service.dto.DoctorRequest;
+import com.healthcare.doctor_service.dto.DoctorResponse;
+import com.healthcare.doctor_service.dto.DoctorUpdateRequest;
+import com.healthcare.doctor_service.service.DoctorService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/doctors")
+@RequiredArgsConstructor
+public class DoctorController {
+
+    private final DoctorService doctorService;
+
+    /**
+     * POST /api/doctors/register
+     * Public endpoint — no authentication required.
+     * Uses X-User-Email header (set by gateway when a token is present),
+     * falling back to the email in the request body.
+     */
+    @PostMapping("/register")
+    public ResponseEntity<DoctorResponse> registerDoctor(
+            @Valid @RequestBody DoctorRequest request,
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail) {
+        String currentUserId = (userEmail != null && !userEmail.isBlank()) ? userEmail : request.getEmail();
+        DoctorResponse response = doctorService.registerDoctor(request, currentUserId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * GET /api/doctors
+     * Retrieve all doctors. Authenticated users may browse.
+     */
+    @GetMapping
+    public ResponseEntity<List<DoctorResponse>> getAllDoctors() {
+        return ResponseEntity.ok(doctorService.getAllDoctors());
+    }
+
+    /**
+     * GET /api/doctors/{id}
+     * Retrieve a single doctor by ID.
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<DoctorResponse> getDoctorById(@PathVariable String id) {
+        return ResponseEntity.ok(doctorService.getDoctorById(id));
+    }
+
+    /**
+     * PATCH /api/doctors/{id}
+     * Partially update doctor profile. Only the owning doctor can update their own profile.
+     * Only non-null fields in the request body will be applied.
+     */
+    @PatchMapping("/{id}")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<DoctorResponse> updateDoctor(
+            @PathVariable String id,
+            @Valid @RequestBody DoctorUpdateRequest request) {
+        String currentUserId = SecurityContextHolder.getContext().getAuthentication().getName();
+        DoctorResponse response = doctorService.updateDoctor(id, request, currentUserId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * DELETE /api/doctors/{id}
+     * Delete a doctor record. Admin only.
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteDoctor(@PathVariable String id) {
+        doctorService.deleteDoctor(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // --- Admin Verification Endpoints ---
+
+    /**
+     * PUT /api/doctors/{id}/verify/approve
+     * Admin approves a doctor's registration.
+     */
+    @PutMapping("/{id}/verify/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<DoctorResponse> approveDoctor(@PathVariable String id) {
+        return ResponseEntity.ok(doctorService.approveDoctor(id));
+    }
+
+    /**
+     * PUT /api/doctors/{id}/verify/reject
+     * Admin rejects a doctor's registration.
+     */
+    @PutMapping("/{id}/verify/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<DoctorResponse> rejectDoctor(@PathVariable String id) {
+        return ResponseEntity.ok(doctorService.rejectDoctor(id));
+    }
+
+    /**
+     * GET /api/doctors/verification?status=PENDING|APPROVED|REJECTED
+     * Admin retrieves doctors by verification status.
+     */
+    @GetMapping("/verification")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<DoctorResponse>> getDoctorsByStatus(
+            @RequestParam(defaultValue = "PENDING") String status) {
+        return ResponseEntity.ok(doctorService.getDoctorsByVerificationStatus(status));
+    }
+}
