@@ -8,6 +8,8 @@ services:
       - "8080:8080"
     environment:
       - JWT_SECRET=${JWT_SECRET}
+      - AUTH_SERVICE_URL=http://auth-service:8088
+      - TELEMEDICINE_SERVICE_URL=http://telemedicine-service:8087
     depends_on: # Ensures these services start before gateway
       - auth-service
       - telemedicine-service
@@ -15,9 +17,10 @@ services:
   auth-service:
     build: ./healthcare-platform/services/auth-service
     ports:
-      - "8085:8085"
+      - "8088:8088"
     environment:
       - MONGO_URI=${MONGO_URI_AUTH}
+      - PORT=8088
       - JWT_SECRET=${JWT_SECRET}
 
   telemedicine-service:
@@ -26,4 +29,5 @@ services:
       - "8087:8087"
     environment:
       - MONGO_URI=${MONGO_URI_TELEMEDICINE}
+      - PORT=8087
       - JWT_SECRET=${JWT_SECRET}
