@@ -13,6 +13,7 @@ public class PatientResponse {
     private String phone;
     private String bloodGroup;
     private String address;
+    private String emergencyContact;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
