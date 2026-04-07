@@ -22,6 +22,6 @@ public class PatientRequest {
     private String phone;
 
     private String bloodGroup;
-    
     private String address;
+    private String emergencyContact; // Optional: emergency contact number
 }

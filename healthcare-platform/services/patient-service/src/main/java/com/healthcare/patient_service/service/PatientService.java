@@ -15,28 +15,19 @@ public class PatientService {
     private final PatientRepository patientRepository;
 
     public PatientResponse createPatient(PatientRequest request, String userId) {
-        // Check if patient already exists for this user
         if (patientRepository.findByUserId(userId).isPresent()) {
             throw new IllegalArgumentException("Patient profile already exists for this user");
         }
 
         Patient patient = new Patient();
         patient.setUserId(userId);
-        patient.setFullName(request.getFullName());
-        patient.setAge(request.getAge());
-        patient.setGender(request.getGender());
-        patient.setPhone(request.getPhone());
-        patient.setBloodGroup(request.getBloodGroup());
-        patient.setAddress(request.getAddress());
+        mapRequestToPatient(request, patient);
 
-        Patient savedPatient = patientRepository.save(patient);
-        return mapToResponse(savedPatient);
+        return mapToResponse(patientRepository.save(patient));
     }
 
     public PatientResponse getPatientById(String patientId) {
-        Patient patient = patientRepository.findById(patientId)
-                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with ID: " + patientId));
-        return mapToResponse(patient);
+        return mapToResponse(findPatientById(patientId));
     }
 
     public PatientResponse getPatientByUserId(String userId) {
@@ -46,23 +37,31 @@ public class PatientService {
     }
 
     public PatientResponse updatePatient(String patientId, PatientRequest request, String currentUserId) {
-        Patient patient = patientRepository.findById(patientId)
-                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with ID: " + patientId));
+        Patient patient = findPatientById(patientId);
 
-        // Check ownership (optional but recommended)
         if (!patient.getUserId().equals(currentUserId)) {
             throw new org.springframework.security.access.AccessDeniedException("You cannot update someone else's profile");
         }
 
+        mapRequestToPatient(request, patient);
+        return mapToResponse(patientRepository.save(patient));
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    private Patient findPatientById(String patientId) {
+        return patientRepository.findById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with ID: " + patientId));
+    }
+
+    private void mapRequestToPatient(PatientRequest request, Patient patient) {
         patient.setFullName(request.getFullName());
         patient.setAge(request.getAge());
         patient.setGender(request.getGender());
         patient.setPhone(request.getPhone());
         patient.setBloodGroup(request.getBloodGroup());
         patient.setAddress(request.getAddress());
-
-        Patient updatedPatient = patientRepository.save(patient);
-        return mapToResponse(updatedPatient);
+        patient.setEmergencyContact(request.getEmergencyContact());
     }
 
     private PatientResponse mapToResponse(Patient patient) {
@@ -75,6 +74,7 @@ public class PatientService {
         response.setPhone(patient.getPhone());
         response.setBloodGroup(patient.getBloodGroup());
         response.setAddress(patient.getAddress());
+        response.setEmergencyContact(patient.getEmergencyContact());
         response.setCreatedAt(patient.getCreatedAt());
         response.setUpdatedAt(patient.getUpdatedAt());
         return response;
