@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Document(collection = "patients")
 @Data
 public class Patient {
-    
+
     @Id
     private String patientId;
 
@@ -25,6 +25,7 @@ public class Patient {
     private String phone;
     private String bloodGroup;
     private String address;
+    private String emergencyContact;
 
     @CreatedDate
     private LocalDateTime createdAt;
