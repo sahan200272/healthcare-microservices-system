@@ -24,11 +24,17 @@ public class ReportController {
     @PreAuthorize("hasRole('PATIENT')")
     public ResponseEntity<MedicalReport> uploadMedicalReport(
             @PathVariable String patientId,
-            @Valid @RequestBody ReportRequest request) {
+            @RequestParam("reportType") String reportType,
+            @RequestParam("description") String description,
+            @RequestParam(value = "file", required = false) org.springframework.web.multipart.MultipartFile file) {
 
         String currentUserId = SecurityContextHolder.getContext().getAuthentication().getName();
-        MedicalReport report = reportService.uploadReport(patientId, request, currentUserId);
-        return new ResponseEntity<>(report, HttpStatus.CREATED);
+        try {
+            MedicalReport report = reportService.uploadReport(patientId, reportType, description, file, currentUserId);
+            return new ResponseEntity<>(report, HttpStatus.CREATED);
+        } catch (java.io.IOException e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @GetMapping
