@@ -20,8 +20,12 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const response = await authApi.login({ username: email, password });
+      const response = await authApi.login({ email: email, password: password });
       localStorage.setItem("token", response.data.token);
+      localStorage.setItem("role", response.data.role);
+      localStorage.setItem("name", response.data.name);
+      localStorage.setItem("id", response.data.id);
+
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.response?.data?.message || "Invalid credentials. Please try again.");
@@ -36,7 +40,7 @@ export default function LoginPage() {
       <div className="absolute top-0 -left-20 w-80 h-80 bg-brand-primary/10 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-0 -right-20 w-80 h-80 bg-brand-secondary/10 rounded-full blur-3xl animate-pulse delay-700" />
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
@@ -61,8 +65,8 @@ export default function LoginPage() {
             <label className="block text-sm font-medium text-clinical-gray mb-1.5 ml-1">Username / Email</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-clinical-gray" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -76,8 +80,8 @@ export default function LoginPage() {
             <label className="block text-sm font-medium text-clinical-gray mb-1.5 ml-1">Password</label>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-clinical-gray" />
-              <input 
-                type="password" 
+              <input
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -95,8 +99,8 @@ export default function LoginPage() {
             <Link href="/" className="text-brand-primary font-medium hover:underline">Forgot Password?</Link>
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={isLoading}
             className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white font-bold py-4 rounded-2xl shadow-lg shadow-brand-primary/25 transition-all flex items-center justify-center group disabled:opacity-70"
           >
