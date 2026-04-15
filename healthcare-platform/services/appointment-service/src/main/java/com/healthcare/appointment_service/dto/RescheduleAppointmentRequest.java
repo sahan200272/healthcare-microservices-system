@@ -1,32 +1,17 @@
 package com.healthcare.appointment_service.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDate;
 
 @Data
-public class AppointmentRequest {
-
-    @NotBlank
-    private String patientId;
-
-    @NotBlank
-    private String doctorId;
-
+public class RescheduleAppointmentRequest {
     @NotNull
     private LocalDate appointmentDate;
 
-    /**
-     * Expected format: {@code HH:mm-HH:mm}.
-     */
-    @NotBlank
     @Pattern(regexp = "^\\d{2}:\\d{2}-\\d{2}:\\d{2}$", message = "timeSlot must be in format HH:mm-HH:mm")
     private String timeSlot;
-
-    @Size(max = 500)
-    private String reason;
 }
+
