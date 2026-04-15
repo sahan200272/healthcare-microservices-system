@@ -1,13 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, User, LogOut, LayoutDashboard, Video } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { Activity, User, LogOut, LayoutDashboard, Video, Stethoscope, FileText, Settings, ShieldAlert, Brain } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -17,19 +23,64 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const navLinks = [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/sessions", label: "Telemedicine", icon: Video },
-    { href: "/profile", label: "Profile", icon: User },
-  ];
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setRole(localStorage.getItem("role"));
+      setUserName(localStorage.getItem("name"));
+      setUserEmail(localStorage.getItem("email"));
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("id");
+    localStorage.removeItem("name");
+    localStorage.removeItem("email");
+    router.push("/login");
+  };
+
+  const getNavLinks = () => {
+    const baseLinks = [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    ];
+
+    if (role === "PATIENT") {
+      return [
+        ...baseLinks,
+        { href: "/browse-doctors", label: "Find Doctors", icon: Stethoscope },
+        { href: "/symptom-checker", label: "Symptom Checker", icon: Brain },
+        { href: "/patient-profile", label: "My Profile", icon: User },
+      ];
+    }
+
+    if (role === "DOCTOR") {
+      return [
+        ...baseLinks,
+        { href: "/doctor/management", label: "My Profile", icon: Settings },
+        { href: "/video", label: "Consultations", icon: Video },
+      ];
+    }
+
+    if (role === "ADMIN") {
+      return [
+        ...baseLinks,
+        { href: "/admin/dashboard", label: "Admin Panel", icon: ShieldAlert },
+      ];
+    }
+
+    return baseLinks;
+  };
+
+  const navLinks = getNavLinks();
 
   // Don't show navbar on login/register pages
   if (pathname === "/login" || pathname === "/register") return null;
 
   return (
-    <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled ? "glass py-2" : "bg-transparent py-4"}`}>
+    <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled ? "glass py-2 shadow-lg" : "bg-transparent py-4"}`}>
       <div className="container mx-auto px-6 flex justify-between items-center">
-        <Link href="/" className="flex items-center space-x-2">
+        <Link href="/dashboard" className="flex items-center space-x-2">
           <div className="bg-brand-primary p-2 rounded-xl">
             <Activity className="text-white w-6 h-6" />
           </div>
@@ -38,22 +89,85 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <div className="hidden md:flex items-center space-x-8">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`flex items-center space-x-2 text-sm font-medium transition-colors hover:text-brand-primary ${
-                pathname.startsWith(link.href) ? "text-brand-primary" : "text-clinical-gray"
-              }`}
+        <div className="hidden md:flex items-center space-x-6">
+          {navLinks.map((link) => {
+            const Icon = link.icon;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`flex items-center space-x-1 text-sm font-medium transition-colors hover:text-brand-primary ${
+                  pathname.startsWith(link.href) ? "text-brand-primary" : "text-clinical-gray"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{link.label}</span>
+              </Link>
+            );
+          })}
+
+          {/* User Menu Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center space-x-3 text-sm font-medium text-clinical-gray hover:text-brand-primary transition-colors bg-brand-primary/5 hover:bg-brand-primary/10 px-4 py-2 rounded-lg"
             >
-              <link.icon className="w-4 h-4" />
-              <span>{link.label}</span>
-            </Link>
-          ))}
-          <button className="flex items-center space-x-2 text-sm font-medium text-red-500 hover:text-red-600 transition-colors">
-            <LogOut className="w-4 h-4" />
-            <span>Logout</span>
+              <div className="w-8 h-8 bg-brand-primary rounded-full flex items-center justify-center text-white font-bold text-xs">
+                {userName ? userName.charAt(0).toUpperCase() : "U"}
+              </div>
+              <span className="hidden md:inline max-w-[100px] truncate">{userName || "User"}</span>
+              <User className="w-4 h-4" />
+            </button>
+
+            {isDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute right-0 mt-2 w-64 glass rounded-2xl shadow-2xl overflow-hidden z-50"
+              >
+                {/* User Info Header */}
+                <div className="bg-gradient-to-r from-brand-primary/10 to-brand-secondary/10 px-4 py-4 border-b border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-brand-primary rounded-full flex items-center justify-center text-white font-bold">
+                      {userName ? userName.charAt(0).toUpperCase() : "U"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-clinical-dark dark:text-clinical-white truncate">
+                        {userName || "User"}
+                      </p>
+                      <p className="text-xs text-clinical-gray truncate">
+                        {userEmail || "user@example.com"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 px-2 py-1 bg-white dark:bg-slate-900 rounded-lg text-xs font-bold text-center text-brand-primary uppercase tracking-widest">
+                    {role || "USER"}
+                  </div>
+                </div>
+
+                {/* Menu Items */}
+                <div className="p-2">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-lg flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Menu */}
+        <div className="md:hidden">
+          <button
+            onClick={handleLogout}
+            className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
           </button>
         </div>
       </div>
