@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: appointment-service
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/appointment-service}
+
+server:
+  port: ${PORT:8084}
+
+jwt:
+  # Must be >= 32 bytes for HMAC SHA signing
+  secret: ${JWT_SECRET:dev-secret-please-change-appointment-service-32bytes}
+
+clients:
+  doctor-service:
+    base-url: ${DOCTOR_SERVICE_URL:http://doctor-service:8083}
+    mock-enabled: ${DOCTOR_SERVICE_MOCK_ENABLED:true}
+  notification-service:
+    base-url: ${NOTIFICATION_SERVICE_URL:http://notification-service:8086}
+    mock-enabled: ${NOTIFICATION_SERVICE_MOCK_ENABLED:true}
+
