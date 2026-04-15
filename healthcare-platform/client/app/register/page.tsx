@@ -9,7 +9,7 @@ import { motion } from "framer-motion";
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
-    username: "",
+    name: "",
     email: "",
     password: "",
     role: "PATIENT",
@@ -93,8 +93,8 @@ export default function RegisterPage() {
               <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-clinical-gray" />
               <input 
                 type="text" 
-                value={formData.username}
-                onChange={(e) => setFormData({...formData, username: e.target.value})}
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
                 required
                 className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl py-3 pl-12 pr-4 focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all"
                 placeholder="johndoe"
