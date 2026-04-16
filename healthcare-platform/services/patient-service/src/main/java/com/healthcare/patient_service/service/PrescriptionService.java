@@ -58,4 +58,20 @@ public class PrescriptionService {
         response.setPrescribedAt(p.getPrescribedAt());
         return response;
     }
+
+    public PrescriptionResponse updatePrescriptionNotes(String prescriptionId, String notes, String currentUserId) {
+        Prescription prescription = prescriptionRepository.findById(prescriptionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Prescription not found with ID: " + prescriptionId));
+
+        com.healthcare.patient_service.model.Patient patient = patientRepository.findById(prescription.getPatientId())
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
+
+        if (!patient.getUserId().equals(currentUserId)) {
+            throw new org.springframework.security.access.AccessDeniedException("You cannot update a prescription for someone else's profile");
+        }
+
+        prescription.setNotes(notes);
+        Prescription saved = prescriptionRepository.save(prescription);
+        return mapToResponse(saved);
+    }
 }
