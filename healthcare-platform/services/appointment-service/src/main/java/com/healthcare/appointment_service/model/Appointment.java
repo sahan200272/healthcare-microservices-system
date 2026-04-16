@@ -49,6 +49,16 @@ public class Appointment {
 
     private String reason;
 
+    /**
+     * Type of consultation: IN_PERSON or VIDEO_CONSULTATION
+     */
+    private String consultationType;
+
+    /**
+     * Reference to VideoSession ID if this is a video consultation
+     */
+    private String videoSessionId;
+
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -114,6 +124,22 @@ public class Appointment {
 
     public void setReason(String reason) {
         this.reason = reason;
+    }
+
+    public String getConsultationType() {
+        return consultationType;
+    }
+
+    public void setConsultationType(String consultationType) {
+        this.consultationType = consultationType;
+    }
+
+    public String getVideoSessionId() {
+        return videoSessionId;
+    }
+
+    public void setVideoSessionId(String videoSessionId) {
+        this.videoSessionId = videoSessionId;
     }
 
     public void setCreatedAt(Instant createdAt) {

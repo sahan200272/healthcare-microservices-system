@@ -5,6 +5,7 @@ import com.healthcare.appointment_service.dto.AppointmentResponse;
 import com.healthcare.appointment_service.dto.RescheduleAppointmentRequest;
 import com.healthcare.appointment_service.client.DoctorServiceClient;
 import com.healthcare.appointment_service.client.NotificationServiceClient;
+import com.healthcare.appointment_service.client.TelemedicineServiceClient;
 import com.healthcare.appointment_service.exception.BadRequestException;
 import com.healthcare.appointment_service.exception.ConflictException;
 import com.healthcare.appointment_service.exception.ForbiddenException;
@@ -13,15 +14,18 @@ import com.healthcare.appointment_service.model.Appointment;
 import com.healthcare.appointment_service.model.AppointmentStatus;
 import com.healthcare.appointment_service.repository.AppointmentRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AppointmentService {
@@ -29,6 +33,7 @@ public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final DoctorServiceClient doctorServiceClient;
     private final NotificationServiceClient notificationServiceClient;
+    private final TelemedicineServiceClient telemedicineServiceClient;
 
     private static final Set<AppointmentStatus> DOUBLE_BOOKING_STATUSES =
             Set.of(AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED);
@@ -72,13 +77,66 @@ public class AppointmentService {
                 .doctorId(request.getDoctorId())
                 .appointmentDate(request.getAppointmentDate())
                 .timeSlot(request.getTimeSlot())
-                .reason(request.getReason())
+                .consultationType(request.getConsultationType() != null ? request.getConsultationType() : "IN_PERSON")
                 .status(AppointmentStatus.PENDING)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
 
         Appointment saved = appointmentRepository.save(appointment);
+        log.info("✅ [AppointmentService] Appointment saved to DB with ID: {}", saved.getId());
+        log.info("   Consultation Type (raw): '{}'", saved.getConsultationType());
+        log.info("   Consultation Type (length): {}", saved.getConsultationType() != null ? saved.getConsultationType().length() : "null");
+
+        // Create video session if this is a video consultation (case-insensitive)
+        if ("VIDEO_CONSULTATION".equalsIgnoreCase(saved.getConsultationType())) {
+            log.info("✅ [AppointmentService] CONDITION MATCHED: Creating video session for video consultation appointment");
+            log.info("   Appointment ID: {}", saved.getId());
+            log.info("   Patient ID: {}", saved.getPatientId());
+            log.info("   Doctor ID: {}", saved.getDoctorId());
+            
+            TelemedicineServiceClient.VideoSessionResponse sessionResponse = null;
+            try {
+                log.info("   [BEFORE] Calling telemedicineServiceClient.createVideoSession()...");
+                sessionResponse = telemedicineServiceClient.createVideoSession(
+                        saved.getId(),
+                        saved.getPatientId(),
+                        saved.getDoctorId()
+                );
+                log.info("   [AFTER] Returned from telemedicineServiceClient.createVideoSession()");
+            } catch (Exception ex) {
+                log.error("❌ [AppointmentService] EXCEPTION while calling telemedicineServiceClient: {}", ex.getMessage());
+                log.error("   Exception Type: {}", ex.getClass().getName());
+                log.error("   Stack Trace: ", ex);
+                sessionResponse = null;
+            }
+            
+            log.info("   [CHECK] sessionResponse is null: {}", sessionResponse == null);
+            if (sessionResponse != null) {
+                log.info("   [CHECK] sessionResponse.getId(): '{}'", sessionResponse.getId());
+                log.info("   [CHECK] sessionResponse.getId() is null: {}", sessionResponse.getId() == null);
+            }
+            
+            if (sessionResponse != null && sessionResponse.getId() != null) {
+                log.info("✅ [AppointmentService] Video session created - linking to appointment");
+                saved.setVideoSessionId(sessionResponse.getId());
+                try {
+                    Appointment updated = appointmentRepository.save(saved);
+                    log.info("✅ [AppointmentService] Appointment updated with videoSessionId: {}", updated.getVideoSessionId());
+                    log.info("   Room Name: {}", sessionResponse.getRoomName());
+                    log.info("   Meeting URL: {}", sessionResponse.getMeetingUrl());
+                } catch (Exception ex) {
+                    log.error("❌ [AppointmentService] Failed to save appointment with videoSessionId: {}", ex.getMessage(), ex);
+                }
+            } else if (sessionResponse == null) {
+                log.warn("⚠️  [AppointmentService] sessionResponse is NULL - video session creation failed completely");
+            } else {
+                log.warn("⚠️  [AppointmentService] sessionResponse.getId() is NULL - sessionResponse exists but has no ID");
+                log.warn("   Full Response: {}", sessionResponse);
+            }
+        } else {
+            log.info("ℹ️ [AppointmentService] CONDITION NOT MATCHED: Appointment type is '{}' (expected 'VIDEO_CONSULTATION'), skipping video session creation", saved.getConsultationType());
+        }
 
         notificationServiceClient.sendAppointmentNotification(
                 NotificationServiceClient.NotificationRequest.builder()
@@ -100,11 +158,69 @@ public class AppointmentService {
     }
 
     public List<AppointmentResponse> getPatientAppointments(String patientId) {
-        return appointmentRepository.findByPatientId(patientId).stream().map(this::toResponse).toList();
+        log.debug("🔍 Querying appointments for patientId: {}", patientId);
+        
+        try {
+            // Guard against null repository (should not happen with Spring DI)
+            if (appointmentRepository == null) {
+                log.error("❌ appointmentRepository is null");
+                return Collections.emptyList();
+            }
+            
+            // Query the database
+            List<Appointment> appointments = appointmentRepository.findByPatientId(patientId);
+            
+            // Guard against null result (unlikely with Spring Data, but be safe)
+            if (appointments == null) {
+                log.warn("⚠️  appointmentRepository.findByPatientId() returned null for patientId: {}", patientId);
+                return Collections.emptyList();
+            }
+            
+            log.debug("✅ Found {} appointments for patientId: {}", appointments.size(), patientId);
+            
+            // Map to response objects
+            List<AppointmentResponse> responses = appointments.stream()
+                    .map(this::toResponse)
+                    .toList();
+            
+            log.info("✅ Converted {} appointments to responses", responses.size());
+            return responses;
+            
+        } catch (Exception ex) {
+            log.error("❌ Exception while fetching appointments for patientId: {}", patientId, ex);
+            throw ex; // Let the global exception handler deal with it
+        }
     }
 
     public List<AppointmentResponse> getDoctorAppointments(String doctorId) {
-        return appointmentRepository.findByDoctorId(doctorId).stream().map(this::toResponse).toList();
+        log.debug("🔍 Querying appointments for doctorId: {}", doctorId);
+        
+        try {
+            if (appointmentRepository == null) {
+                log.error("❌ appointmentRepository is null");
+                return Collections.emptyList();
+            }
+            
+            List<Appointment> appointments = appointmentRepository.findByDoctorId(doctorId);
+            
+            if (appointments == null) {
+                log.warn("⚠️  appointmentRepository.findByDoctorId() returned null for doctorId: {}", doctorId);
+                return Collections.emptyList();
+            }
+            
+            log.debug("✅ Found {} appointments for doctorId: {}", appointments.size(), doctorId);
+            
+            List<AppointmentResponse> responses = appointments.stream()
+                    .map(this::toResponse)
+                    .toList();
+            
+            log.info("✅ Converted {} appointments to responses", responses.size());
+            return responses;
+            
+        } catch (Exception ex) {
+            log.error("❌ Exception while fetching appointments for doctorId: {}", doctorId, ex);
+            throw ex;
+        }
     }
 
     public AppointmentResponse confirmAppointment(String id, String doctorId) {
@@ -240,17 +356,34 @@ public class AppointmentService {
     }
 
     private AppointmentResponse toResponse(Appointment a) {
-        return AppointmentResponse.builder()
-                .id(a.getId())
-                .patientId(a.getPatientId())
-                .doctorId(a.getDoctorId())
-                .appointmentDate(a.getAppointmentDate())
-                .timeSlot(a.getTimeSlot())
-                .status(a.getStatus())
-                .reason(a.getReason())
-                .createdAt(a.getCreatedAt())
-                .updatedAt(a.getUpdatedAt())
-                .build();
+        if (a == null) {
+            log.warn("⚠️  toResponse called with null appointment");
+            throw new IllegalArgumentException("Appointment cannot be null");
+        }
+
+        try {
+            // Validate critical fields
+            if (a.getId() == null) {
+                log.warn("⚠️  Appointment has null ID: {}", a);
+            }
+
+            return AppointmentResponse.builder()
+                    .id(a.getId())
+                    .patientId(a.getPatientId())
+                    .doctorId(a.getDoctorId())
+                    .appointmentDate(a.getAppointmentDate())
+                    .timeSlot(a.getTimeSlot())
+                    .status(a.getStatus())
+                    .reason(a.getReason())
+                    .consultationType(a.getConsultationType())
+                    .videoSessionId(a.getVideoSessionId())
+                    .createdAt(a.getCreatedAt())
+                    .updatedAt(a.getUpdatedAt())
+                    .build();
+        } catch (Exception ex) {
+            log.error("❌ Error converting appointment to response: {}", a, ex);
+            throw ex;
+        }
     }
 
     private void validateNotPast(LocalDate date, String timeSlot) {
