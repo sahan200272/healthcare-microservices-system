@@ -23,16 +23,16 @@ public class DoctorController {
 
     /**
      * POST /api/doctors/register
-     * Public endpoint — no authentication required.
-     * Uses X-User-Email header (set by gateway when a token is present),
-     * falling back to the email in the request body.
+     * Authenticated endpoint — requires a valid JWT with role DOCTOR.
+     * The userId (MongoDB ObjectId from auth-service) is extracted from the JWT claims,
+     * not from the request body or any manually supplied header.
      */
     @PostMapping("/register")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<DoctorResponse> registerDoctor(
-            @Valid @RequestBody DoctorRequest request,
-            @RequestHeader(value = "X-User-Email", required = false) String userEmail) {
-        String currentUserId = (userEmail != null && !userEmail.isBlank()) ? userEmail : request.getEmail();
-        DoctorResponse response = doctorService.registerDoctor(request, currentUserId);
+            @Valid @RequestBody DoctorRequest request) {
+        String userId = (String) SecurityContextHolder.getContext().getAuthentication().getDetails();
+        DoctorResponse response = doctorService.registerDoctor(request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -64,7 +64,7 @@ public class DoctorController {
     public ResponseEntity<DoctorResponse> updateDoctor(
             @PathVariable String id,
             @Valid @RequestBody DoctorUpdateRequest request) {
-        String currentUserId = SecurityContextHolder.getContext().getAuthentication().getName();
+        String currentUserId = (String) SecurityContextHolder.getContext().getAuthentication().getDetails();
         DoctorResponse response = doctorService.updateDoctor(id, request, currentUserId);
         return ResponseEntity.ok(response);
     }

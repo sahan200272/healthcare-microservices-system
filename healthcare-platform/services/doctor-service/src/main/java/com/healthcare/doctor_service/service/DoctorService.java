@@ -21,6 +21,12 @@ public class DoctorService {
     private final DoctorRepository doctorRepository;
 
     public DoctorResponse registerDoctor(DoctorRequest request, String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new BadRequestException("Unable to resolve authenticated user ID from token.");
+        }
+        if (doctorRepository.existsByUserId(userId)) {
+            throw new BadRequestException("A doctor profile already exists for this account.");
+        }
         if (doctorRepository.existsByEmail(request.getEmail())) {
             throw new BadRequestException("A doctor with this email already exists.");
         }
