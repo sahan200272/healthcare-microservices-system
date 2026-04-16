@@ -209,5 +209,37 @@ public class AppointmentClientService {
         return headers;
     }
 
-    record AppointmentDetailsResponse(String id, String doctorId, String status) {}
+    /**
+     * Verifies the appointment belongs to the given doctor and returns the associated patientId.
+     * Used by PatientReportService to fetch the correct patient's reports for a given appointment.
+     *
+     * [INTEGRATION POINT] Calls: GET /api/appointments/{appointmentId}
+     *
+     * @throws AppointmentNotFoundException if the appointment does not exist
+     * @throws UnauthorizedDoctorException  if the appointment does not belong to this doctor
+     * @throws BadRequestException          if patientId is missing or service is unreachable
+     */
+    public String getPatientIdForDoctorAppointment(String doctorId, String appointmentId, String jwtToken) {
+        AppointmentDetailsResponse appointment = fetchAppointmentById(appointmentId, jwtToken);
+
+        // NOTE: Appointment Service stores the patient's auth-service userId in patientId
+        // (enforced at booking: patientId == JWT userId). This value is a userId, not Patient._id.
+        log.info("Appointment {}: stored patientId (auth userId)={}", appointmentId, appointment.patientId());
+        log.info("Appointment {}: stored doctorId={}, requesting doctorId={}",
+                appointmentId, appointment.doctorId(), doctorId);
+
+        if (!doctorId.equals(appointment.doctorId())) {
+            throw new UnauthorizedDoctorException(
+                    "Doctor " + doctorId + " is not authorized for appointment " + appointmentId);
+        }
+
+        if (appointment.patientId() == null || appointment.patientId().isBlank()) {
+            throw new BadRequestException(
+                    "Appointment " + appointmentId + " has no associated patient.");
+        }
+
+        return appointment.patientId();
+    }
+
+    record AppointmentDetailsResponse(String id, String doctorId, String patientId, String status) {}
 }

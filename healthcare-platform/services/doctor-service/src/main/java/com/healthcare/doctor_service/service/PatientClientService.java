@@ -1,5 +1,6 @@
 package com.healthcare.doctor_service.service;
 
+import com.healthcare.doctor_service.dto.MedicalReportResponse;
 import com.healthcare.doctor_service.dto.PatientDetailsResponse;
 import com.healthcare.doctor_service.exception.BadRequestException;
 import com.healthcare.doctor_service.exception.ResourceNotFoundException;
@@ -12,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+
+import java.util.List;
 
 /**
  * Client service for communicating with the Patient Service via REST.
@@ -104,6 +107,55 @@ public class PatientClientService {
             throw new BadRequestException(
                     "Patient Service returned error: " + ex.getResponseBodyAsString());
         } catch (WebClientException ex) {
+            throw new BadRequestException(
+                    "Patient Service is not reachable. Enable simulation mode or start the service.");
+        }
+    }
+
+    /**
+     * Fetches all medical reports for a patient from the Patient Service.
+     * [INTEGRATION POINT] Calls: GET /api/patients/{patientId}/reports
+     *
+     * @param patientId  the Patient Service document ID
+     * @param jwtToken   forwarded Bearer token for auth
+     * @return           list of medical reports (empty list in simulation mode)
+     * @throws ResourceNotFoundException if the patient is not found (404)
+     * @throws BadRequestException       if the Patient Service is unavailable
+     */
+    public List<MedicalReportResponse> getPatientReports(String patientId, String jwtToken) {
+        if (simulateMode) {
+            log.warn("PatientClientService is in SIMULATION mode. Returning empty report list for patientId={}", patientId);
+            return List.of();
+        }
+
+        log.info("Fetching medical reports from Patient Service for patientId={}", patientId);
+        try {
+            return patientWebClient.get()
+                    .uri("/api/patients/{patientId}/reports", patientId)
+                    .header("Authorization", "Bearer " + jwtToken)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, response -> {
+                        if (response.statusCode().value() == 404) {
+                            return response.createException()
+                                    .map(ex -> new ResourceNotFoundException(
+                                            "Patient not found with id: " + patientId));
+                        }
+                        return response.createException()
+                                .map(ex -> new BadRequestException("Patient Service error: " + ex.getMessage()));
+                    })
+                    .bodyToFlux(MedicalReportResponse.class)
+                    .collectList()
+                    .block();
+        } catch (ResourceNotFoundException | BadRequestException ex) {
+            throw ex;
+        } catch (WebClientResponseException ex) {
+            log.error("Patient Service returned HTTP error fetching reports for patientId={}: {}",
+                    patientId, ex.getResponseBodyAsString());
+            throw new BadRequestException(
+                    "Patient Service returned error: " + ex.getResponseBodyAsString());
+        } catch (WebClientException ex) {
+            log.error("Patient Service is not reachable while fetching reports for patientId={}: {}",
+                    patientId, ex.getMessage());
             throw new BadRequestException(
                     "Patient Service is not reachable. Enable simulation mode or start the service.");
         }
