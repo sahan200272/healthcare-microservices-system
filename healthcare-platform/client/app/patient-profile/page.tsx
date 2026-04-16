@@ -45,40 +45,66 @@ export default function PatientProfilePage() {
     email: "",
     phone: "",
     address: "",
-    dateOfBirth: "",
+    age: "",
     gender: "",
     bloodType: "",
-    allergies: "",
   });
+  const [isNewProfile, setIsNewProfile] = useState(false);
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
+  const [dbPatientId, setDbPatientId] = useState("");
 
-  const patientId = typeof window !== "undefined" ? localStorage.getItem("id") : "";
+  const userId = typeof window !== "undefined" ? (localStorage.getItem("id") ?? "") : "";
+  const userName = typeof window !== "undefined" ? (localStorage.getItem("name") ?? "") : "";
+  const userEmail = typeof window !== "undefined" ? (localStorage.getItem("email") ?? "") : "";
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        if (patientId) {
-          const profileResponse = await patientApi.getProfile(patientId);
-          setProfile(profileResponse.data);
+        if (userId) {
+          const profileResponse = await patientApi.getProfileByUserId(userId);
+          const data = profileResponse.data || {};
+          setProfile({
+            name: data.fullName || userName,
+            email: userEmail,
+            phone: data.phone || "",
+            address: data.address || "",
+            age: data.age?.toString() || "",
+            gender: data.gender || "",
+            bloodType: data.bloodGroup || "",
+          });
+          
+          if (data.patientId) {
+            setDbPatientId(data.patientId);
+          }
+          setIsNewProfile(false);
 
-          const docsResponse = await patientApi.getDocuments(patientId);
-          setDocuments(docsResponse.data || []);
-
-          const prescsResponse = await patientApi.getPrescriptions(patientId);
-          setPrescriptions(prescsResponse.data || []);
+          // Once we have the true patientId, we can load documents and prescriptions safely
+          if (data.patientId) {
+            const docsResponse = await patientApi.getDocuments(data.patientId);
+            setDocuments(docsResponse.data || []);
+            
+            const prescsResponse = await patientApi.getPrescriptions(data.patientId);
+            setPrescriptions(prescsResponse.data || []);
+          }
         }
       } catch (error) {
         console.error("Failed to load profile:", error);
+        setIsNewProfile(true);
+        setProfile(prev => ({
+          ...prev,
+          name: userName,
+          email: userEmail
+        }));
       }
     };
 
     loadProfile();
-  }, [patientId]);
+  }, [userId]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -89,7 +115,7 @@ export default function PatientProfilePage() {
       formData.append("file", e.target.files[0]);
       formData.append("documentType", e.target.files[0].name.split(".").pop() || "image");
 
-      const response = await patientApi.uploadDocument(patientId, formData);
+      const response = await patientApi.uploadDocument(dbPatientId, formData);
       setDocuments([...documents, response.data]);
     } catch (error) {
       console.error("Upload failed:", error);
@@ -112,7 +138,26 @@ export default function PatientProfilePage() {
 
   const handleSaveProfile = async () => {
     try {
-      await patientApi.updateProfile(patientId, profile);
+      const payload = {
+        fullName: profile.name,
+        age: parseInt(profile.age) || 0,
+        gender: profile.gender || "Not Specified",
+        phone: profile.phone || "0000000000",
+        address: profile.address,
+        bloodGroup: profile.bloodType,
+        emergencyContact: "",
+      };
+
+      // If dbPatientId is known, update the existing record
+      if (dbPatientId) {
+        await patientApi.updateProfile(dbPatientId, payload);
+      } else {
+        // Fallback for new patients missing an ID constraint depending on your backend
+        await patientApi.createProfile(payload);
+        // Force refresh after creation to set IDs
+        window.location.reload();
+      }
+      
       setEditMode(false);
       alert("Profile updated successfully!");
     } catch (error) {
@@ -267,22 +312,43 @@ export default function PatientProfilePage() {
                   )}
                 </div>
 
-                {/* Allergies */}
+                {/* Age */}
                 <div>
                   <label className="block text-sm font-bold text-clinical-gray mb-2 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
-                    Allergies
+                    <Calendar className="w-4 h-4" />
+                    Age
                   </label>
                   {editMode ? (
                     <input
-                      type="text"
-                      value={profile.allergies}
-                      onChange={(e) => setProfile({ ...profile, allergies: e.target.value })}
-                      placeholder="e.g., Penicillin, Nuts..."
+                      type="number"
+                      value={profile.age}
+                      onChange={(e) => setProfile({ ...profile, age: e.target.value })}
                       className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
                     />
                   ) : (
-                    <p className="text-clinical-dark dark:text-clinical-white">{profile.allergies || "--"}</p>
+                    <p className="text-clinical-dark dark:text-clinical-white">{profile.age || "--"}</p>
+                  )}
+                </div>
+
+                {/* Gender */}
+                <div>
+                  <label className="block text-sm font-bold text-clinical-gray mb-2 flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    Gender
+                  </label>
+                  {editMode ? (
+                    <select
+                      value={profile.gender}
+                      onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  ) : (
+                    <p className="text-clinical-dark dark:text-clinical-white">{profile.gender || "--"}</p>
                   )}
                 </div>
               </div>
