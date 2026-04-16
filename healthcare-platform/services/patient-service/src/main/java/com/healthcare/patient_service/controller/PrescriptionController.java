@@ -33,4 +33,15 @@ public class PrescriptionController {
     public ResponseEntity<List<PrescriptionResponse>> getPrescriptions(@PathVariable String patientId) {
         return ResponseEntity.ok(prescriptionService.getPrescriptionsByPatientId(patientId));
     }
+
+    @PutMapping("/{prescriptionId}/notes")
+    @PreAuthorize("hasRole('PATIENT')")
+    public ResponseEntity<PrescriptionResponse> updatePrescriptionNotes(
+            @PathVariable String patientId,
+            @PathVariable String prescriptionId,
+            @RequestBody java.util.Map<String, String> body) {
+        String notes = body.get("notes");
+        String currentUserId = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        return ResponseEntity.ok(prescriptionService.updatePrescriptionNotes(prescriptionId, notes, currentUserId));
+    }
 }

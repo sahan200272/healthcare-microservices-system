@@ -52,35 +52,51 @@ export const telemedicineApi = {
 // Appointment API
 export const appointmentApi = {
   searchDoctors: (params: { specialty?: string; search?: string }) => 
-    api.get("/api/appointments/doctors", { params }),
+    api.get("/api/doctors", { params }),
   getDoctor: (doctorId: string) => 
-    api.get(`/api/appointments/doctors/${doctorId}`),
+    api.get(`/api/doctors/${doctorId}`),
   bookAppointment: (appointmentData: any) => 
-    api.post("/api/appointments/book", appointmentData),
+    api.post("/api/appointments", appointmentData),
   getAppointments: (userId: string, role: "patient" | "doctor") => 
     api.get(`/api/appointments/${role}/${userId}`),
   updateAppointmentStatus: (appointmentId: string, status: string) => 
     api.put(`/api/appointments/${appointmentId}/status`, { status }),
+  confirmAppointment: (appointmentId: string) => 
+    api.put(`/api/appointments/${appointmentId}/confirm`, {}),
   cancelAppointment: (appointmentId: string) => 
     api.put(`/api/appointments/${appointmentId}/cancel`, {}),
+  rescheduleAppointment: (appointmentId: string, request: { appointmentDate: string, timeSlot: string }) => 
+    api.put(`/api/appointments/${appointmentId}/reschedule`, request),
 };
 
 // Patient API
 export const patientApi = {
+  createProfile: (profileData: any) => 
+    api.post("/api/patients", profileData),
   getProfile: (patientId: string) => 
     api.get(`/api/patients/${patientId}`),
+  getProfileByUserId: (userId: string) => 
+    api.get(`/api/patients/user/${userId}`),
   updateProfile: (patientId: string, profileData: any) => 
     api.put(`/api/patients/${patientId}`, profileData),
-  uploadDocument: (patientId: string, formData: FormData) => 
-    api.post(`/api/patients/${patientId}/documents`, formData, {
+  uploadReport: (patientId: string, formData: FormData) => 
+    api.post(`/api/patients/${patientId}/reports`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
-  getDocuments: (patientId: string) => 
-    api.get(`/api/patients/${patientId}/documents`),
+  updateReport: (patientId: string, reportId: string, formData: FormData) => 
+    api.put(`/api/patients/${patientId}/reports/${reportId}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  getReports: (patientId: string) => 
+    api.get(`/api/patients/${patientId}/reports`),
   getPrescriptions: (patientId: string) => 
     api.get(`/api/patients/${patientId}/prescriptions`),
+  updatePrescriptionNotes: (patientId: string, prescriptionId: string, notes: string) => 
+    api.put(`/api/patients/${patientId}/prescriptions/${prescriptionId}/notes`, { notes }),
   getMedicalHistory: (patientId: string) => 
-    api.get(`/api/patients/${patientId}/medical-history`),
+    api.get(`/api/patients/${patientId}/history`),
+  addMedicalHistory: (patientId: string, historyData: any) => 
+    api.post(`/api/patients/${patientId}/history`, historyData),
 };
 
 // Doctor API

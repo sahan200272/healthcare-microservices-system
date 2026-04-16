@@ -25,6 +25,7 @@ export default function LoginPage() {
       localStorage.setItem("role", response.data.role);
       localStorage.setItem("name", response.data.name);
       localStorage.setItem("id", response.data.id);
+      localStorage.setItem("email", email);
 
       router.push("/dashboard");
     } catch (err: any) {

@@ -15,13 +15,13 @@ import Link from "next/link";
 import { appointmentApi } from "@/lib/api";
 
 interface Doctor {
-  id: string;
-  name: string;
-  specialty: string;
-  rating: number;
-  reviews: number;
-  experience: number;
-  location: string;
+  doctorId: string;
+  fullName: string;
+  specialization: string;
+  rating?: number; // Backend might not have this yet, keep optional
+  reviews?: number;
+  experienceYears: number;
+  location?: string;
   consultationFee: number;
   profileImage?: string;
   verified: boolean;
@@ -56,11 +56,11 @@ export default function BrowseDoctorsPage() {
 
         // Sort based on selection
         if (sortBy === "rating") {
-          doctorsData.sort((a: Doctor, b: Doctor) => b.rating - a.rating);
+          doctorsData.sort((a: Doctor, b: Doctor) => (b.rating || 0) - (a.rating || 0));
         } else if (sortBy === "fee") {
           doctorsData.sort((a: Doctor, b: Doctor) => a.consultationFee - b.consultationFee);
         } else if (sortBy === "experience") {
-          doctorsData.sort((a: Doctor, b: Doctor) => b.experience - a.experience);
+          doctorsData.sort((a: Doctor, b: Doctor) => b.experienceYears - a.experienceYears);
         }
 
         setDoctors(doctorsData);
@@ -146,7 +146,7 @@ export default function BrowseDoctorsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {doctors.map((doctor, idx) => (
               <motion.div
-                key={doctor.id}
+                key={doctor.doctorId}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.1 }}
@@ -164,10 +164,10 @@ export default function BrowseDoctorsPage() {
                       </span>
                     )}
                   </div>
-                  <h3 className="text-xl font-bold mb-1">{doctor.name}</h3>
+                  <h3 className="text-xl font-bold mb-1">{doctor.fullName}</h3>
                   <p className="text-white/80 text-sm flex items-center gap-1">
                     <Stethoscope className="w-4 h-4" />
-                    {doctor.specialty}
+                    {doctor.specialization}
                   </p>
                 </div>
 
@@ -180,7 +180,7 @@ export default function BrowseDoctorsPage() {
                         <Star
                           key={i}
                           className={`w-4 h-4 ${
-                            i < Math.floor(doctor.rating)
+                            i < Math.floor(doctor.rating || 4.5)
                               ? "fill-yellow-400 text-yellow-400"
                               : "text-clinical-gray/30"
                           }`}
@@ -188,7 +188,7 @@ export default function BrowseDoctorsPage() {
                       ))}
                     </div>
                     <span className="text-sm font-bold text-clinical-dark dark:text-clinical-white">
-                      {doctor.rating} ({doctor.reviews} reviews)
+                      {doctor.rating || 4.5} ({doctor.reviews || 0} reviews)
                     </span>
                   </div>
 
@@ -198,11 +198,11 @@ export default function BrowseDoctorsPage() {
                       <span className="font-bold text-clinical-dark dark:text-clinical-white">
                         Experience:
                       </span>{" "}
-                      {doctor.experience} years
+                      {doctor.experienceYears} years
                     </p>
                     <p className="flex items-center gap-2">
                       <MapPin className="w-4 h-4" />
-                      {doctor.location}
+                      {doctor.location || "Online / Medical Center"}
                     </p>
                   </div>
 
@@ -216,7 +216,7 @@ export default function BrowseDoctorsPage() {
 
                   {/* Book Button */}
                   <Link
-                    href={`/doctors/${doctor.id}/book`}
+                    href={`/doctors/${doctor.doctorId}/book`}
                     className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white py-3 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 mt-4"
                   >
                     <Calendar className="w-4 h-4" />
