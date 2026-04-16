@@ -3,6 +3,7 @@ package com.healthcare.doctor_service.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -29,7 +30,10 @@ public class WebClientConfig {
     @Bean
     public RestTemplate appointmentRestTemplate(
             @Value("${services.appointment.base-url}") String appointmentBaseUrl) {
-        RestTemplate restTemplate = new RestTemplate();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3_000);  // 3 s connection timeout
+        factory.setReadTimeout(5_000);     // 5 s read timeout
+        RestTemplate restTemplate = new RestTemplate(factory);
         restTemplate.setUriTemplateHandler(new DefaultUriBuilderFactory(appointmentBaseUrl));
         return restTemplate;
     }

@@ -39,6 +39,19 @@ services:
       - PORT=8087
       - JWT_SECRET=${JWT_SECRET}
 
+  doctor-service:
+    build: ./healthcare-platform/services/doctor-service
+    ports:
+      - "8083:8083"
+    environment:
+      - MONGO_URI=${MONGO_URI_DOCTOR}
+      - PORT=8083
+      - JWT_SECRET=${JWT_SECRET}
+      - APPOINTMENT_SERVICE_URL=http://appointment-service:8082
+      - PATIENT_SERVICE_URL=http://patient-service:8085
+    depends_on:
+      - auth-service
+
   appointment-service:
     build: ./healthcare-platform/services/appointment-service
     ports:
@@ -52,17 +65,6 @@ services:
     depends_on:
       - doctor-service
       - notification-service
-
-  doctor-service:
-    build: ./healthcare-platform/services/doctor-service
-    ports:
-      - "8083:8083"
-    environment:
-      - MONGO_URI=${MONGO_URI_DOCTOR}
-      - PORT=8083
-      - JWT_SECRET=${JWT_SECRET}
-      - APPOINTMENT_SERVICE_URL=http://appointment-service:8082
-      - PATIENT_SERVICE_URL=http://patient-service:8085
 
   notification-service:
     build: ./healthcare-platform/services/notification-service

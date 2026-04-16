@@ -85,17 +85,51 @@ public class AppointmentController {
         return ResponseEntity.ok(appointments);
     }
 
-    // 5. Confirm Appointment (Doctor role only)
+    // 5. Accept Appointment (Doctor role only) — PENDING → ACCEPTED
     @PreAuthorize("hasRole('DOCTOR')")
-    @PutMapping("/{id}/confirm")
-    public ResponseEntity<AppointmentResponse> confirm(@PathVariable String id) {
-        log.info("✅ Confirming appointment: {}", id);
-        String doctorId = SecurityUtils.currentUserId()
+    @PutMapping("/{id}/accept")
+    public ResponseEntity<AppointmentResponse> accept(
+            @PathVariable String id,
+            @RequestHeader("Authorization") String authHeader) {
+        String userId = SecurityUtils.currentUserId()
                 .orElseThrow(() -> new ForbiddenException("Missing userId claim in JWT"));
-        AppointmentResponse response = appointmentService.confirmAppointment(id, doctorId);
-        log.info("✅ Appointment confirmed: {}", id);
-        return ResponseEntity.ok(response);
+        String token = authHeader.substring(7);
+        return ResponseEntity.ok(appointmentService.acceptAppointment(id, userId, token));
     }
+
+// 5b. Confirm Appointment (Doctor role only)
+@PreAuthorize("hasRole('DOCTOR')")
+@PutMapping("/{id}/confirm")
+public ResponseEntity<AppointmentResponse> confirm(
+        @PathVariable String id,
+        @RequestHeader("Authorization") String authHeader) {
+
+    String userId = SecurityUtils.currentUserId()
+            .orElseThrow(() -> new ForbiddenException("Missing userId claim in JWT"));
+
+    String token = authHeader.substring(7);
+
+    return ResponseEntity.ok(
+            appointmentService.confirmAppointment(id, userId, token)
+    );
+}
+
+// 5c. Reject Appointment (Doctor role only)
+@PreAuthorize("hasRole('DOCTOR')")
+@PutMapping("/{id}/reject")
+public ResponseEntity<AppointmentResponse> reject(
+        @PathVariable String id,
+        @RequestHeader("Authorization") String authHeader) {
+
+    String userId = SecurityUtils.currentUserId()
+            .orElseThrow(() -> new ForbiddenException("Missing userId claim in JWT"));
+
+    String token = authHeader.substring(7);
+
+    return ResponseEntity.ok(
+            appointmentService.rejectAppointment(id, userId, token)
+    );
+}
 
     // 6. Cancel Appointment (Patient role only)
     @PreAuthorize("hasRole('PATIENT')")
