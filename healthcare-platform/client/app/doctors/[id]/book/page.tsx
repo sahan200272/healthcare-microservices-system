@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Calendar,
@@ -11,24 +11,35 @@ import {
   ArrowLeft,
   CheckCircle2,
   Loader2,
+  Stethoscope,
 } from "lucide-react";
+import { appointmentApi, doctorApi, telemedicineApi, paymentApi, notificationApi } from "@/lib/api";
 import Link from "next/link";
-import { appointmentApi, paymentApi, notificationApi } from "@/lib/api";
 
 interface TimeSlot {
   time: string;
   available: boolean;
 }
 
+interface Availability {
+  availableDate: string;
+  timeSlots: string[];
+  bookedSlots: string[];
+  active: boolean;
+}
+
 export default function BookAppointmentPage() {
   const params = useParams();
   const router = useRouter();
   const doctorId = params.id as string;
+  const searchParams = useSearchParams();
+  const rescheduleId = searchParams.get("reschedule");
 
   const [doctor, setDoctor] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [notes, setNotes] = useState("");
+  const [availability, setAvailability] = useState<Availability[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loading, setLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
@@ -37,37 +48,39 @@ export default function BookAppointmentPage() {
   const patientId = typeof window !== "undefined" ? localStorage.getItem("id") : "";
 
   useEffect(() => {
-    const fetchDoctor = async () => {
+    const fetchDoctorData = async () => {
       try {
-        const response = await appointmentApi.getDoctor(doctorId);
-        setDoctor(response.data);
+        const [doctorRes, availabilityRes] = await Promise.all([
+          appointmentApi.getDoctor(doctorId),
+          doctorApi.getAvailability(doctorId)
+        ]);
+        setDoctor(doctorRes.data);
+        setAvailability(availabilityRes.data || []);
       } catch (error) {
-        console.error("Failed to fetch doctor:", error);
+        console.error("Failed to fetch doctor data:", error);
       }
     };
 
     if (doctorId) {
-      fetchDoctor();
+      fetchDoctorData();
     }
   }, [doctorId]);
 
-  // Generate time slots
+  // Generate time slots when date selection changes
   useEffect(() => {
-    if (selectedDate) {
-      const slots: TimeSlot[] = [];
-      for (let hour = 8; hour < 18; hour++) {
-        slots.push({
-          time: `${hour.toString().padStart(2, "0")}:00`,
-          available: Math.random() > 0.3, // Simulate availability
-        });
-        slots.push({
-          time: `${hour.toString().padStart(2, "0")}:30`,
-          available: Math.random() > 0.3,
-        });
+    if (selectedDate && availability.length > 0) {
+      const dayAvailability = availability.find(a => a.availableDate === selectedDate);
+      if (dayAvailability) {
+        const slots: TimeSlot[] = dayAvailability.timeSlots.map(time => ({
+          time,
+          available: !dayAvailability.bookedSlots.includes(time)
+        }));
+        setTimeSlots(slots);
+      } else {
+        setTimeSlots([]);
       }
-      setTimeSlots(slots);
     }
-  }, [selectedDate]);
+  }, [selectedDate, availability]);
 
   const handleBookAppointment = async () => {
     if (!selectedDate || !selectedTime) {
@@ -77,56 +90,79 @@ export default function BookAppointmentPage() {
 
     setLoading(true);
     try {
-      // Create appointment
-      const appointmentResponse = await appointmentApi.bookAppointment({
-        patientId,
-        doctorId,
-        date: selectedDate,
-        time: selectedTime,
-        notes,
-        status: "PENDING",
-        consultationFee: doctor?.consultationFee,
-      });
+      let appointmentResponse;
+      
+      const formattedTimeSlot = selectedTime.includes('-') 
+        ? selectedTime 
+        : (() => {
+            const [h, m] = selectedTime.split(':').map(Number);
+            const em = m + 30;
+            const eh = h + Math.floor(em / 60);
+            const fm = em % 60;
+            return `${selectedTime}-${eh.toString().padStart(2, '0')}:${fm.toString().padStart(2, '0')}`;
+          })();
+      
+      if (rescheduleId) {
+        // Reschedule existing appointment
+        appointmentResponse = await appointmentApi.rescheduleAppointment(rescheduleId, {
+          appointmentDate: selectedDate,
+          timeSlot: formattedTimeSlot,
+        });
+      } else {
+        // Create new appointment
+        appointmentResponse = await appointmentApi.bookAppointment({
+          patientId,
+          doctorId,
+          appointmentDate: selectedDate,
+          timeSlot: formattedTimeSlot,
+          reason: notes || "Regular checkup",
+        });
+      }
 
       const newAppointmentId = appointmentResponse.data.id;
       setAppointmentId(newAppointmentId);
 
-      // Initiate payment
-      await paymentApi.initiatePayment({
-        appointmentId: newAppointmentId,
-        patientId,
-        doctorId,
-        amount: doctor?.consultationFee,
-        currency: "LKR",
-      });
+      // Initiate payment (simulated or actual if service exists)
+      try {
+        await paymentApi.initiatePayment({
+          appointmentId: newAppointmentId,
+          patientId,
+          doctorId,
+          amount: doctor?.consultationFee || 2000,
+          currency: "LKR",
+        });
+      } catch (err) {
+        console.warn("Payment initiation failed, but appointment created:", err);
+      }
 
       // Send notifications
-      await notificationApi.sendAppointmentConfirmation({
-        appointmentId: newAppointmentId,
-        patientId,
-        doctorId,
-        email: localStorage.getItem("email"),
-        phone: localStorage.getItem("phone"),
-      });
+      try {
+        await notificationApi.sendAppointmentConfirmation({
+          appointmentId: newAppointmentId,
+          patientId,
+          doctorId,
+          email: localStorage.getItem("email"),
+          phone: localStorage.getItem("phone"),
+        });
+      } catch (err) {
+        console.warn("Notification failed, but appointment created:", err);
+      }
 
       setBookingSuccess(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Booking failed:", error);
-      alert("Failed to book appointment");
+      alert(error.response?.data?.message || "Failed to book appointment. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Get next 7 days
+  // Get available dates from backend data
   const getAvailableDates = () => {
-    const dates = [];
-    for (let i = 1; i <= 7; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() + i);
-      dates.push(date.toISOString().split("T")[0]);
-    }
-    return dates;
+    return availability
+      .filter(a => a.active)
+      .map(a => a.availableDate)
+      .sort();
   };
 
   if (!doctor) {
@@ -150,14 +186,16 @@ export default function BookAppointmentPage() {
             <CheckCircle2 className="w-20 h-20 text-green-500 mx-auto" />
           </motion.div>
           <h1 className="text-2xl font-bold text-clinical-dark dark:text-clinical-white mb-3">
-            Appointment Booked!
+            {rescheduleId ? "Appointment Rescheduled!" : "Appointment Booked!"}
           </h1>
           <p className="text-clinical-gray mb-6">
-            Your appointment has been confirmed. You'll receive SMS and email confirmation shortly.
+            {rescheduleId 
+              ? "Your appointment has been successfully updated."
+              : "Your appointment has been booked and is awaiting doctor approval."}
           </p>
           <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-4 mb-6 text-left">
             <p className="text-sm text-clinical-gray mb-2">
-              <span className="font-bold text-clinical-dark dark:text-clinical-white">Doctor:</span> {doctor.name}
+              <span className="font-bold text-clinical-dark dark:text-clinical-white">Doctor:</span> Dr. {doctor.fullName}
             </p>
             <p className="text-sm text-clinical-gray mb-2">
               <span className="font-bold text-clinical-dark dark:text-clinical-white">Date:</span> {selectedDate}
@@ -193,7 +231,7 @@ export default function BookAppointmentPage() {
           {/* Main Form */}
           <div className="lg:col-span-2">
             <h1 className="text-3xl font-bold text-clinical-dark dark:text-clinical-white mb-8">
-              Book Appointment
+              {rescheduleId ? "Reschedule Appointment" : "Book Appointment"}
             </h1>
 
             <div className="space-y-8">
@@ -261,18 +299,19 @@ export default function BookAppointmentPage() {
                 />
               </div>
 
+
               {/* Book Button */}
               <button
                 onClick={handleBookAppointment}
                 disabled={loading || !selectedDate || !selectedTime}
-                className="w-full bg-brand-primary hover:bg-brand-primary/90 disabled:bg-clinical-gray text-white py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2"
+                className="w-full bg-brand-primary hover:bg-brand-primary/90 disabled:bg-clinical-gray text-white py-4 rounded-3xl font-bold transition-all flex items-center justify-center gap-3 shadow-lg shadow-brand-primary/20"
               >
                 {loading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <>
-                    <CreditCard className="w-5 h-5" />
-                    Proceed to Payment
+                    <Calendar className="w-5 h-5" />
+                    {rescheduleId ? "Confirm Reschedule" : "Confirm & Book Appointment"}
                   </>
                 )}
               </button>
@@ -281,46 +320,70 @@ export default function BookAppointmentPage() {
 
           {/* Doctor Summary */}
           <div className="lg:col-span-1">
-            <div className="glass rounded-3xl p-6 sticky top-24">
-              <h2 className="text-xl font-bold text-clinical-dark dark:text-clinical-white mb-6">
-                Summary
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="glass rounded-[2rem] p-8 sticky top-24 border border-white/10 shadow-2xl"
+            >
+              <h2 className="text-2xl font-bold text-clinical-dark dark:text-clinical-white mb-8">
+                Booking Summary
               </h2>
-
+ 
               {/* Doctor Info */}
-              <div className="bg-brand-primary/10 rounded-2xl p-4 mb-6">
-                <h3 className="font-bold text-clinical-dark dark:text-clinical-white mb-2">Dr. {doctor.name}</h3>
-                <p className="text-sm text-clinical-gray mb-3">{doctor.specialty}</p>
-                <div className="flex items-center gap-1 text-sm mb-3">
-                  {[...Array(5)].map((_, i) => (
-                    <span key={i} className="text-yellow-400">
-                      ★
-                    </span>
-                  ))}
-                  <span className="text-clinical-gray ml-2">({doctor.reviews} reviews)</span>
+              <div className="flex items-center gap-4 mb-8 bg-brand-primary/5 dark:bg-brand-primary/10 p-4 rounded-[1.5rem]">
+                <div className="w-16 h-16 bg-brand-primary/10 rounded-2xl flex items-center justify-center text-brand-primary shrink-0">
+                  <Stethoscope className="w-8 h-8" />
                 </div>
-                <p className="text-xs text-clinical-gray">{doctor.experience} years experience</p>
+                <div>
+                  <h3 className="font-bold text-clinical-dark dark:text-clinical-white">Dr. {doctor.fullName}</h3>
+                  <p className="text-sm text-clinical-gray">{doctor.specialization}</p>
+                </div>
               </div>
-
+ 
               {/* Details */}
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between">
-                  <span className="text-clinical-gray">Date</span>
-                  <span className="font-bold text-clinical-dark dark:text-clinical-white">{selectedDate || "--"}</span>
+              <div className="space-y-4 mb-8">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-clinical-gray flex items-center gap-2">
+                    <Calendar className="w-4 h-4" /> Date
+                  </span>
+                  <span className="font-bold text-clinical-dark dark:text-clinical-white">{selectedDate || "Not selected"}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-clinical-gray">Time</span>
-                  <span className="font-bold text-clinical-dark dark:text-clinical-white">{selectedTime || "--"}</span>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-clinical-gray flex items-center gap-2">
+                    <Clock className="w-4 h-4" /> Time
+                  </span>
+                  <span className="font-bold text-clinical-dark dark:text-clinical-white">{selectedTime || "Not selected"}</span>
                 </div>
-                <div className="border-t border-slate-200 dark:border-slate-800 pt-3 flex justify-between text-lg">
-                  <span className="font-bold text-clinical-dark dark:text-clinical-white">Consultation Fee</span>
-                  <span className="font-bold text-brand-primary">Rs. {doctor.consultationFee}</span>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-clinical-gray flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" /> Type
+                  </span>
+                  <span className="font-bold text-brand-primary">
+                    In-Person
+                  </span>
+                </div>
+                
+                <div className="h-px bg-slate-200 dark:bg-slate-800 my-4" />
+                
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-clinical-dark dark:text-clinical-white text-lg">Total</span>
+                  <span className="text-3xl font-bold text-brand-primary font-mono">
+                    Rs. {doctor.consultationFee}
+                  </span>
                 </div>
               </div>
-
-              <p className="text-xs text-clinical-gray text-center">
-                Secure payment via multiple payment methods
-              </p>
-            </div>
+ 
+              <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-4 flex items-center gap-3">
+                <div className="w-8 h-8 bg-green-500/10 rounded-full flex items-center justify-center text-green-500">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <p className="text-[10px] text-clinical-gray leading-tight">
+                  Your booking is secured by SSL encryption and HealthSync's data protection policy.
+                </p>
+              </div>
+            </motion.div>
           </div>
         </div>
       </div>
