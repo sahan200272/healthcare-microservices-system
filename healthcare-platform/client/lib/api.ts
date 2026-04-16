@@ -71,6 +71,8 @@ export const patientApi = {
     api.post("/api/patients", profileData),
   getProfile: (patientId: string) => 
     api.get(`/api/patients/${patientId}`),
+  getProfileByUserId: (userId: string) => 
+    api.get(`/api/patients/user/${userId}`),
   updateProfile: (patientId: string, profileData: any) => 
     api.put(`/api/patients/${patientId}`, profileData),
   uploadDocument: (patientId: string, formData: FormData) => 

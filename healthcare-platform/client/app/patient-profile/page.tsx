@@ -41,14 +41,13 @@ interface Prescription {
 export default function PatientProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState({
-    name: typeof window !== "undefined" ? (localStorage.getItem("name") ?? "") : "",
-    email: typeof window !== "undefined" ? (localStorage.getItem("email") ?? "") : "",
+    name: "",
+    email: "",
     phone: "",
     address: "",
     age: "",
     gender: "",
     bloodType: "",
-    allergies: "",
   });
   const [isNewProfile, setIsNewProfile] = useState(false);
 
@@ -57,16 +56,17 @@ export default function PatientProfilePage() {
   const [editMode, setEditMode] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
+  const [dbPatientId, setDbPatientId] = useState("");
 
-  const patientId = typeof window !== "undefined" ? (localStorage.getItem("id") ?? "") : "";
+  const userId = typeof window !== "undefined" ? (localStorage.getItem("id") ?? "") : "";
   const userName = typeof window !== "undefined" ? (localStorage.getItem("name") ?? "") : "";
   const userEmail = typeof window !== "undefined" ? (localStorage.getItem("email") ?? "") : "";
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        if (patientId) {
-          const profileResponse = await patientApi.getProfile(patientId);
+        if (userId) {
+          const profileResponse = await patientApi.getProfileByUserId(userId);
           const data = profileResponse.data || {};
           setProfile({
             name: data.fullName || userName,
@@ -76,15 +76,21 @@ export default function PatientProfilePage() {
             age: data.age?.toString() || "",
             gender: data.gender || "",
             bloodType: data.bloodGroup || "",
-            allergies: data.emergencyContact || "",
           });
+          
+          if (data.patientId) {
+            setDbPatientId(data.patientId);
+          }
           setIsNewProfile(false);
 
-          const docsResponse = await patientApi.getDocuments(patientId);
-          setDocuments(docsResponse.data || []);
-
-          const prescsResponse = await patientApi.getPrescriptions(patientId);
-          setPrescriptions(prescsResponse.data || []);
+          // Once we have the true patientId, we can load documents and prescriptions safely
+          if (data.patientId) {
+            const docsResponse = await patientApi.getDocuments(data.patientId);
+            setDocuments(docsResponse.data || []);
+            
+            const prescsResponse = await patientApi.getPrescriptions(data.patientId);
+            setPrescriptions(prescsResponse.data || []);
+          }
         }
       } catch (error) {
         console.error("Failed to load profile:", error);
@@ -98,7 +104,7 @@ export default function PatientProfilePage() {
     };
 
     loadProfile();
-  }, [patientId]);
+  }, [userId]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -109,7 +115,7 @@ export default function PatientProfilePage() {
       formData.append("file", e.target.files[0]);
       formData.append("documentType", e.target.files[0].name.split(".").pop() || "image");
 
-      const response = await patientApi.uploadDocument(patientId, formData);
+      const response = await patientApi.uploadDocument(dbPatientId, formData);
       setDocuments([...documents, response.data]);
     } catch (error) {
       console.error("Upload failed:", error);
@@ -139,15 +145,19 @@ export default function PatientProfilePage() {
         phone: profile.phone || "0000000000",
         address: profile.address,
         bloodGroup: profile.bloodType,
-        emergencyContact: profile.allergies,
+        emergencyContact: "",
       };
 
-      if (isNewProfile) {
-        await patientApi.createProfile(payload);
-        setIsNewProfile(false);
+      // If dbPatientId is known, update the existing record
+      if (dbPatientId) {
+        await patientApi.updateProfile(dbPatientId, payload);
       } else {
-        await patientApi.updateProfile(patientId, payload);
+        // Fallback for new patients missing an ID constraint depending on your backend
+        await patientApi.createProfile(payload);
+        // Force refresh after creation to set IDs
+        window.location.reload();
       }
+      
       setEditMode(false);
       alert("Profile updated successfully!");
     } catch (error) {
