@@ -53,12 +53,12 @@ public class AppointmentClientService {
                                                        String appointmentId,
                                                        String jwtToken) {
         validateBeforeStatusChange(doctorId, appointmentId, jwtToken);
-        cancelAppointmentOnService(appointmentId, jwtToken);
+        rejectAppointmentOnService(appointmentId, jwtToken);
 
         return new AppointmentActionResponse(
                 appointmentId,
-                "CANCELLED",
-                "Appointment rejected (cancelled) by doctor " + doctorId);
+                "REJECTED",
+                "Appointment rejected by doctor " + doctorId);
     }
 
     private void validateBeforeStatusChange(String doctorId, String appointmentId, String jwtToken) {
@@ -141,8 +141,39 @@ public class AppointmentClientService {
     }
 
     /**
+     * Calls PUT /api/appointments/{id}/reject on the Appointment Service.
+     * Sets appointment status to REJECTED. Only callable by the owning doctor.
+     */
+    private void rejectAppointmentOnService(String appointmentId, String jwtToken) {
+        HttpEntity<Void> entity = new HttpEntity<>(buildHeaders(jwtToken));
+        log.info("Rejecting appointment on Appointment Service: PUT /api/appointments/{}/reject", appointmentId);
+        try {
+            appointmentRestTemplate.exchange(
+                    "/api/appointments/{id}/reject",
+                    HttpMethod.PUT,
+                    entity,
+                    Void.class,
+                    appointmentId
+            );
+        } catch (HttpClientErrorException.NotFound ex) {
+            throw new AppointmentNotFoundException("Appointment not found: " + appointmentId);
+        } catch (HttpClientErrorException ex) {
+            log.error("Appointment Service error on reject: status={}, body={}",
+                    ex.getStatusCode(), ex.getResponseBodyAsString());
+            throw new BadRequestException("Failed to reject appointment: " + ex.getResponseBodyAsString());
+        } catch (HttpServerErrorException ex) {
+            log.error("Appointment Service server error on reject: status={}, body={}",
+                    ex.getStatusCode(), ex.getResponseBodyAsString());
+            throw new BadRequestException("Appointment Service error on reject: " + ex.getResponseBodyAsString());
+        } catch (RestClientException ex) {
+            log.error("Appointment Service unreachable on reject: {}", ex.getMessage());
+            throw new BadRequestException("Appointment Service is not reachable.");
+        }
+    }
+
+    /**
      * Calls PUT /api/appointments/{id}/cancel on the Appointment Service.
-     * Used when a doctor rejects — maps to a CANCELLED status.
+     * Used when a patient cancels their own appointment.
      */
     private void cancelAppointmentOnService(String appointmentId, String jwtToken) {
         HttpEntity<Void> entity = new HttpEntity<>(buildHeaders(jwtToken));

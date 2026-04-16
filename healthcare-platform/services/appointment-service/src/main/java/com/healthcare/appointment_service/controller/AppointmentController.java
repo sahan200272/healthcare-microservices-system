@@ -82,6 +82,18 @@ public class AppointmentController {
         return ResponseEntity.ok(appointmentService.confirmAppointment(id, userId, token));
     }
 
+    // 5c. Reject Appointment (Doctor role only) — PENDING → REJECTED
+    @PreAuthorize("hasRole('DOCTOR')")
+    @PutMapping("/{id}/reject")
+    public ResponseEntity<AppointmentResponse> reject(
+            @PathVariable String id,
+            @RequestHeader("Authorization") String authHeader) {
+        String userId = SecurityUtils.currentUserId()
+                .orElseThrow(() -> new ForbiddenException("Missing userId claim in JWT"));
+        String token = authHeader.substring(7);
+        return ResponseEntity.ok(appointmentService.rejectAppointment(id, userId, token));
+    }
+
     // 6. Cancel Appointment (Patient role only)
     @PreAuthorize("hasRole('PATIENT')")
     @PutMapping("/{id}/cancel")

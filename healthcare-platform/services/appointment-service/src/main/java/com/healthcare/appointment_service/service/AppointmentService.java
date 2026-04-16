@@ -177,6 +177,37 @@ public class AppointmentService {
         return toResponse(saved);
     }
 
+    public AppointmentResponse rejectAppointment(String id, String userId, String jwtToken) {
+        Appointment appointment = findByIdOrThrow(id);
+
+        String doctorId = doctorServiceClient.getDoctorIdByUserId(userId, jwtToken);
+
+        if (!appointment.getDoctorId().equals(doctorId)) {
+            throw new ForbiddenException("You cannot reject an appointment for another doctor");
+        }
+        if (appointment.getStatus() != AppointmentStatus.PENDING) {
+            throw new BadRequestException("Only PENDING appointments can be rejected");
+        }
+
+        appointment.setStatus(AppointmentStatus.REJECTED);
+        appointment.setUpdatedAt(Instant.now());
+        Appointment saved = appointmentRepository.save(appointment);
+
+        notificationServiceClient.sendAppointmentNotification(
+                NotificationServiceClient.NotificationRequest.builder()
+                        .type("REJECTED")
+                        .appointmentId(saved.getId())
+                        .patientId(saved.getPatientId())
+                        .doctorId(saved.getDoctorId())
+                        .appointmentDate(saved.getAppointmentDate())
+                        .timeSlot(saved.getTimeSlot())
+                        .message("Appointment rejected by doctor")
+                        .build()
+        );
+
+        return toResponse(saved);
+    }
+
     public AppointmentResponse cancelAppointment(String id, String patientId) {
         Appointment appointment = findByIdOrThrow(id);
 
