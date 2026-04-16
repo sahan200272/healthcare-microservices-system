@@ -29,4 +29,44 @@ public class AppointmentRequest {
 
     @Size(max = 500)
     private String reason;
+
+    public @NotBlank String getPatientId() {
+        return patientId;
+    }
+
+    public @NotBlank String getDoctorId() {
+        return doctorId;
+    }
+
+    public @NotNull LocalDate getAppointmentDate() {
+        return appointmentDate;
+    }
+
+    public @NotBlank @Pattern(regexp = "^\\d{2}:\\d{2}-\\d{2}:\\d{2}$", message = "timeSlot must be in format HH:mm-HH:mm") String getTimeSlot() {
+        return timeSlot;
+    }
+
+    public @Size(max = 500) String getReason() {
+        return reason;
+    }
+
+    public void setPatientId(@NotBlank String patientId) {
+        this.patientId = patientId;
+    }
+
+    public void setDoctorId(@NotBlank String doctorId) {
+        this.doctorId = doctorId;
+    }
+
+    public void setAppointmentDate(@NotNull LocalDate appointmentDate) {
+        this.appointmentDate = appointmentDate;
+    }
+
+    public void setTimeSlot(@NotBlank @Pattern(regexp = "^\\d{2}:\\d{2}-\\d{2}:\\d{2}$", message = "timeSlot must be in format HH:mm-HH:mm") String timeSlot) {
+        this.timeSlot = timeSlot;
+    }
+
+    public void setReason(@Size(max = 500) String reason) {
+        this.reason = reason;
+    }
 }

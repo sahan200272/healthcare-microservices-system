@@ -121,10 +121,12 @@ export const notificationApi = {
 
 // Admin API
 export const adminApi = {
+  getDashboardStats: () => 
+    api.get("/api/admin/dashboard/stats"),
   getUsers: () => 
     api.get("/api/admin/users"),
-  verifyDoctor: (doctorId: string) => 
-    api.put(`/api/admin/doctors/${doctorId}/verify`, {}),
+  verifyDoctor: (doctorId: string, verificationData: any) => 
+    api.put(`/api/admin/doctors/${doctorId}/verify`, verificationData),
   rejectDoctor: (doctorId: string, reason: string) => 
     api.put(`/api/admin/doctors/${doctorId}/reject`, { reason }),
   getPendingDoctors: () => 

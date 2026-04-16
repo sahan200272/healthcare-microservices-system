@@ -3,7 +3,7 @@ version: '3.8'
 services:
 
   api-gateway:
-    build: ./healthcare-platform/services/api-gateway
+    build: ./healthcare-platform/services/api-gateway # access Dockerfile of this service
     ports:
       - "8080:8080"
     environment:
@@ -15,7 +15,7 @@ services:
       - telemedicine-service
 
   auth-service:
-    build: ./healthcare-platform/services/auth-service
+    build: ./healthcare-platform/services/auth-service # access Dockerfile of this service
     ports:
       - "8088:8088"
     environment:
@@ -24,7 +24,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
 
   telemedicine-service:
-    build: ./healthcare-platform/services/telemedicine-service
+    build: ./healthcare-platform/services/telemedicine-service # access Dockerfile of this service
     ports:
       - "8087:8087"
     environment:

@@ -2,6 +2,7 @@ package com.healthcare.appointment_service.client;
 
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -12,7 +13,9 @@ import java.time.LocalDate;
 @Component
 @RequiredArgsConstructor
 public class NotificationServiceClient {
-    private final WebClient webClient;
+
+    @Autowired
+    private WebClient webClient;
 
     @Value("${clients.notification-service.base-url:http://notification-service:8086}")
     private String notificationServiceBaseUrl;

@@ -9,6 +9,7 @@ import com.healthcare.appointment_service.exception.ForbiddenException;
 import com.healthcare.appointment_service.security.SecurityUtils;
 import com.healthcare.appointment_service.service.AppointmentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -23,7 +24,8 @@ import java.util.List;
 @Validated
 public class AppointmentController {
 
-    private final AppointmentService appointmentService;
+    @Autowired
+    private AppointmentService appointmentService;
 
     // 1. Create Appointment
     @PreAuthorize("hasRole('PATIENT')")

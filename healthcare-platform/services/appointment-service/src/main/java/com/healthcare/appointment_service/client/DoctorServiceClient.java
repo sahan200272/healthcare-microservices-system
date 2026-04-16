@@ -1,6 +1,7 @@
 package com.healthcare.appointment_service.client;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -10,7 +11,9 @@ import java.time.LocalDate;
 @Component
 @RequiredArgsConstructor
 public class DoctorServiceClient {
-    private final WebClient webClient;
+
+    @Autowired
+    private WebClient webClient;
 
     @Value("${clients.doctor-service.base-url:http://doctor-service:8083}")
     private String doctorServiceBaseUrl;
