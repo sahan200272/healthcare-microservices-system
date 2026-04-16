@@ -79,16 +79,24 @@ export const patientApi = {
     api.get(`/api/patients/user/${userId}`),
   updateProfile: (patientId: string, profileData: any) => 
     api.put(`/api/patients/${patientId}`, profileData),
-  uploadDocument: (patientId: string, formData: FormData) => 
-    api.post(`/api/patients/${patientId}/documents`, formData, {
+  uploadReport: (patientId: string, formData: FormData) => 
+    api.post(`/api/patients/${patientId}/reports`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
-  getDocuments: (patientId: string) => 
-    api.get(`/api/patients/${patientId}/documents`),
+  updateReport: (patientId: string, reportId: string, formData: FormData) => 
+    api.put(`/api/patients/${patientId}/reports/${reportId}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  getReports: (patientId: string) => 
+    api.get(`/api/patients/${patientId}/reports`),
   getPrescriptions: (patientId: string) => 
     api.get(`/api/patients/${patientId}/prescriptions`),
+  updatePrescriptionNotes: (patientId: string, prescriptionId: string, notes: string) => 
+    api.put(`/api/patients/${patientId}/prescriptions/${prescriptionId}/notes`, { notes }),
   getMedicalHistory: (patientId: string) => 
-    api.get(`/api/patients/${patientId}/medical-history`),
+    api.get(`/api/patients/${patientId}/history`),
+  addMedicalHistory: (patientId: string, historyData: any) => 
+    api.post(`/api/patients/${patientId}/history`, historyData),
 };
 
 // Doctor API
