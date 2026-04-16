@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Loader2,
   Stethoscope,
+  Video,
 } from "lucide-react";
 import { appointmentApi, doctorApi, telemedicineApi, paymentApi, notificationApi } from "@/lib/api";
 import Link from "next/link";
@@ -38,6 +39,7 @@ export default function BookAppointmentPage() {
   const [doctor, setDoctor] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
+  const [consultationType, setConsultationType] = useState<string>("IN_PERSON");
   const [notes, setNotes] = useState("");
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
@@ -115,6 +117,7 @@ export default function BookAppointmentPage() {
           doctorId,
           appointmentDate: selectedDate,
           timeSlot: formattedTimeSlot,
+          consultationType: consultationType,
           reason: notes || "Regular checkup",
         });
       }
@@ -286,6 +289,38 @@ export default function BookAppointmentPage() {
                 </div>
               )}
 
+              {/* Select Consultation Type */}
+              <div>
+                <label className="block text-lg font-bold text-clinical-dark dark:text-clinical-white mb-4">
+                  Consultation Type
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => setConsultationType("IN_PERSON")}
+                    className={`p-4 rounded-2xl font-bold transition-all border-2 ${
+                      consultationType === "IN_PERSON"
+                        ? "bg-brand-primary text-white border-brand-primary"
+                        : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-clinical-dark dark:text-clinical-white hover:border-brand-primary"
+                    }`}
+                  >
+                    <MapPin className="w-5 h-5 inline mr-2" />
+                    In-Person
+                  </button>
+                  <button
+                    onClick={() => setConsultationType("VIDEO_CONSULTATION")}
+                    className={`p-4 rounded-2xl font-bold transition-all border-2 ${
+                      consultationType === "VIDEO_CONSULTATION"
+                        ? "bg-brand-primary text-white border-brand-primary"
+                        : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-clinical-dark dark:text-clinical-white hover:border-brand-primary"
+                    }`}
+                  >
+                    <Video className="w-5 h-5 inline mr-2" />
+                    Video Call
+                  </button>
+                </div>
+              </div>
+
+              {/* 
               {/* Notes */}
               <div>
                 <label className="block text-lg font-bold text-clinical-dark dark:text-clinical-white mb-4">
@@ -327,7 +362,7 @@ export default function BookAppointmentPage() {
             >
               <h2 className="text-2xl font-bold text-clinical-dark dark:text-clinical-white mb-8">
                 Booking Summary
-              </h2>
+              </h2>{consultationType === "VIDEO_CONSULTATION" ? "Video Consultation" : "In-Person"}
  
               {/* Doctor Info */}
               <div className="flex items-center gap-4 mb-8 bg-brand-primary/5 dark:bg-brand-primary/10 p-4 rounded-[1.5rem]">

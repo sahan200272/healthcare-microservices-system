@@ -30,6 +30,11 @@ public class AppointmentRequest {
     @Size(max = 500)
     private String reason;
 
+    /**
+     * Type of consultation: IN_PERSON or VIDEO_CONSULTATION
+     */
+    private String consultationType;
+
     public @NotBlank String getPatientId() {
         return patientId;
     }
@@ -68,5 +73,13 @@ public class AppointmentRequest {
 
     public void setReason(@Size(max = 500) String reason) {
         this.reason = reason;
+    }
+
+    public String getConsultationType() {
+        return consultationType;
+    }
+
+    public void setConsultationType(String consultationType) {
+        this.consultationType = consultationType;
     }
 }

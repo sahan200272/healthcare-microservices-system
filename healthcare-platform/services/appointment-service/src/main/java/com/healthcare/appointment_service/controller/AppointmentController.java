@@ -8,72 +8,105 @@ import com.healthcare.appointment_service.dto.RescheduleAppointmentRequest;
 import com.healthcare.appointment_service.exception.ForbiddenException;
 import com.healthcare.appointment_service.security.SecurityUtils;
 import com.healthcare.appointment_service.service.AppointmentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/appointments")
 @RequiredArgsConstructor
 @Validated
 public class AppointmentController {
 
-    @Autowired
-    private AppointmentService appointmentService;
+    private final AppointmentService appointmentService;
 
     // 1. Create Appointment
     @PreAuthorize("hasRole('PATIENT')")
     @PostMapping
     public ResponseEntity<AppointmentResponse> create(@Valid @RequestBody AppointmentRequest request) {
+        log.info("📝 Creating appointment for patient: {}", request.getPatientId());
         enforceSelfIfPresent(request.getPatientId());
-        return ResponseEntity.ok(appointmentService.createAppointment(request));
+        AppointmentResponse response = appointmentService.createAppointment(request);
+        log.info("✅ Appointment created: {}", response.getId());
+        return ResponseEntity.ok(response);
     }
 
     // 2. View Appointment by ID
     @PreAuthorize("hasAnyRole('PATIENT','DOCTOR','ADMIN')")
     @GetMapping("/{id}")
     public ResponseEntity<AppointmentResponse> getById(@PathVariable String id) {
-        return ResponseEntity.ok(appointmentService.getAppointmentById(id));
+        log.debug("🔍 Fetching appointment: {}", id);
+        AppointmentResponse response = appointmentService.getAppointmentById(id);
+        return ResponseEntity.ok(response);
     }
 
     // 3. View Appointments by Patient ID
     @PreAuthorize("hasRole('PATIENT')")
     @GetMapping("/patient/{patientId}")
     public ResponseEntity<List<AppointmentResponse>> getByPatient(@PathVariable String patientId) {
-        enforceSelfIfPresent(patientId);
-        return ResponseEntity.ok(appointmentService.getPatientAppointments(patientId));
+        log.info("📋 Fetching appointments for patient: {}", patientId);
+        
+        try {
+            // Authorization check: ensure user only accesses their own data
+            enforceSelfIfPresent(patientId);
+            log.debug("✅ Authorization check passed for patient: {}", patientId);
+            
+            // Fetch appointments
+            List<AppointmentResponse> appointments = appointmentService.getPatientAppointments(patientId);
+            log.info("✅ Retrieved {} appointments for patient: {}", 
+                    appointments != null ? appointments.size() : 0, patientId);
+            
+            return ResponseEntity.ok(appointments);
+        } catch (ForbiddenException ex) {
+            log.warn("🔒 Authorization failed for patient: {}", patientId);
+            throw ex;
+        } catch (Exception ex) {
+            log.error("❌ Error fetching appointments for patient: {}", patientId, ex);
+            throw ex;
+        }
     }
 
     // 4. View Appointments by Doctor ID
     @PreAuthorize("hasRole('DOCTOR')")
     @GetMapping("/doctor/{doctorId}")
     public ResponseEntity<List<AppointmentResponse>> getByDoctor(@PathVariable String doctorId) {
+        log.info("📋 Fetching appointments for doctor: {}", doctorId);
         enforceSelfIfPresent(doctorId);
-        return ResponseEntity.ok(appointmentService.getDoctorAppointments(doctorId));
+        List<AppointmentResponse> appointments = appointmentService.getDoctorAppointments(doctorId);
+        log.info("✅ Retrieved {} appointments for doctor: {}", 
+                appointments != null ? appointments.size() : 0, doctorId);
+        return ResponseEntity.ok(appointments);
     }
 
     // 5. Confirm Appointment (Doctor role only)
     @PreAuthorize("hasRole('DOCTOR')")
     @PutMapping("/{id}/confirm")
     public ResponseEntity<AppointmentResponse> confirm(@PathVariable String id) {
+        log.info("✅ Confirming appointment: {}", id);
         String doctorId = SecurityUtils.currentUserId()
                 .orElseThrow(() -> new ForbiddenException("Missing userId claim in JWT"));
-        return ResponseEntity.ok(appointmentService.confirmAppointment(id, doctorId));
+        AppointmentResponse response = appointmentService.confirmAppointment(id, doctorId);
+        log.info("✅ Appointment confirmed: {}", id);
+        return ResponseEntity.ok(response);
     }
 
     // 6. Cancel Appointment (Patient role only)
     @PreAuthorize("hasRole('PATIENT')")
     @PutMapping("/{id}/cancel")
     public ResponseEntity<AppointmentResponse> cancel(@PathVariable String id) {
+        log.info("❌ Cancelling appointment: {}", id);
         String patientId = SecurityUtils.currentUserId()
                 .orElseThrow(() -> new ForbiddenException("Missing userId claim in JWT"));
-        return ResponseEntity.ok(appointmentService.cancelAppointment(id, patientId));
+        AppointmentResponse response = appointmentService.cancelAppointment(id, patientId);
+        log.info("✅ Appointment cancelled: {}", id);
+        return ResponseEntity.ok(response);
     }
 
     // 7. Reschedule Appointment
@@ -83,22 +116,38 @@ public class AppointmentController {
             @PathVariable String id,
             @Valid @RequestBody RescheduleAppointmentRequest request
     ) {
+        log.info("🔄 Rescheduling appointment: {} to date: {}, slot: {}", 
+                id, request.getAppointmentDate(), request.getTimeSlot());
         String patientId = SecurityUtils.currentUserId()
                 .orElseThrow(() -> new ForbiddenException("Missing userId claim in JWT"));
-        return ResponseEntity.ok(appointmentService.rescheduleAppointment(id, patientId, request));
+        AppointmentResponse response = appointmentService.rescheduleAppointment(id, patientId, request);
+        log.info("✅ Appointment rescheduled: {}", id);
+        return ResponseEntity.ok(response);
     }
 
     // 8. Admin view all appointments
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public ResponseEntity<List<AppointmentResponse>> getAll() {
-        return ResponseEntity.ok(appointmentService.getAllAppointments());
+        log.info("👨‍💼 Admin fetching all appointments");
+        List<AppointmentResponse> appointments = appointmentService.getAllAppointments();
+        log.info("✅ Retrieved {} total appointments", 
+                appointments != null ? appointments.size() : 0);
+        return ResponseEntity.ok(appointments);
     }
 
-    private void enforceSelfIfPresent(String pathOrBodyId) {
-        // In this project, tokens might include "userId"; if present, enforce "own" access.
-        SecurityUtils.currentUserId().ifPresent(jwtUserId -> {
-            if (!jwtUserId.equals(pathOrBodyId)) {
+    /**
+     * Enforces that the current user can only access their own resources.
+     * Throws ForbiddenException if userId is present in JWT but doesn't match the requested ID.
+     * 
+     * @param requestedId The ID being accessed (patientId, doctorId, etc.)
+     * @throws ForbiddenException if user's ID doesn't match the requested ID
+     */
+    private void enforceSelfIfPresent(String requestedId) {
+        SecurityUtils.currentUserId().ifPresent(currentUserId -> {
+            if (!currentUserId.equals(requestedId)) {
+                log.warn("🔒 Unauthorized access attempt. currentUserId: {}, requestedId: {}", 
+                        currentUserId, requestedId);
                 throw new ForbiddenException("You can only access your own resources");
             }
         });
