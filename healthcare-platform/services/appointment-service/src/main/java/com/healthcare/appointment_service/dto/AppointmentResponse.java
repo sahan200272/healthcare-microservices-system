@@ -17,6 +17,8 @@ public class AppointmentResponse {
     String timeSlot;
     AppointmentStatus status;
     String reason;
+    String consultationType;
+    String videoSessionId;
     Instant createdAt;
     Instant updatedAt;
 }
