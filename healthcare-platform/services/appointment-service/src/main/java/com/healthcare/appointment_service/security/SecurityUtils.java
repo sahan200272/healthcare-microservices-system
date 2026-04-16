@@ -11,8 +11,13 @@ public final class SecurityUtils {
     public static Optional<String> currentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) return Optional.empty();
-        // Return getName() which contains the Email (subject) from the JWT
-        return Optional.ofNullable(auth.getName());
+
+        Object details = auth.getDetails();
+        if (details instanceof JwtUserDetails jwt) {
+            return Optional.ofNullable(jwt.userId());
+        }
+
+        return Optional.empty();
     }
 
     public static Optional<String> currentRole() {

@@ -26,7 +26,7 @@ RUN chown appuser:appgroup app.jar
 
 USER appuser
 
-EXPOSE 8084
+EXPOSE 8082
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
 
