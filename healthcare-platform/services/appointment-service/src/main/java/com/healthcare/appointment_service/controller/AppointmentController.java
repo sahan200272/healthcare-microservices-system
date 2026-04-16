@@ -58,13 +58,28 @@ public class AppointmentController {
         return ResponseEntity.ok(appointmentService.getDoctorAppointments(doctorId));
     }
 
-    // 5. Confirm Appointment (Doctor role only)
+    // 5. Accept Appointment (Doctor role only) — PENDING → ACCEPTED
+    @PreAuthorize("hasRole('DOCTOR')")
+    @PutMapping("/{id}/accept")
+    public ResponseEntity<AppointmentResponse> accept(
+            @PathVariable String id,
+            @RequestHeader("Authorization") String authHeader) {
+        String userId = SecurityUtils.currentUserId()
+                .orElseThrow(() -> new ForbiddenException("Missing userId claim in JWT"));
+        String token = authHeader.substring(7);
+        return ResponseEntity.ok(appointmentService.acceptAppointment(id, userId, token));
+    }
+
+    // 5b. Confirm Appointment (Doctor role only) — kept for backward compatibility
     @PreAuthorize("hasRole('DOCTOR')")
     @PutMapping("/{id}/confirm")
-    public ResponseEntity<AppointmentResponse> confirm(@PathVariable String id) {
-        String doctorId = SecurityUtils.currentUserId()
+    public ResponseEntity<AppointmentResponse> confirm(
+            @PathVariable String id,
+            @RequestHeader("Authorization") String authHeader) {
+        String userId = SecurityUtils.currentUserId()
                 .orElseThrow(() -> new ForbiddenException("Missing userId claim in JWT"));
-        return ResponseEntity.ok(appointmentService.confirmAppointment(id, doctorId));
+        String token = authHeader.substring(7);
+        return ResponseEntity.ok(appointmentService.confirmAppointment(id, userId, token));
     }
 
     // 6. Cancel Appointment (Patient role only)

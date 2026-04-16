@@ -32,6 +32,26 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ApiError> handleRuntime(RuntimeException ex, HttpServletRequest request) {
+        // Covers inter-service communication failures (e.g. "Doctor Service is not reachable")
+        // thrown as plain RuntimeException by service clients.
+        // Return 502 so the caller (e.g. doctor-service) can distinguish this from a 4xx logic error.
+        if (ex instanceof BadRequestException || ex instanceof ConflictException
+                || ex instanceof ForbiddenException || ex instanceof NotFoundException) {
+            return handleKnown(ex, request);
+        }
+        ApiError body = ApiError.builder()
+                .timestamp(Instant.now())
+                .status(HttpStatus.BAD_GATEWAY.value())
+                .error(HttpStatus.BAD_GATEWAY.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .fieldErrors(null)
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(body);
+    }
+
     @ExceptionHandler({BadRequestException.class, ConflictException.class, ForbiddenException.class, NotFoundException.class})
     public ResponseEntity<ApiError> handleKnown(RuntimeException ex, HttpServletRequest request) {
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;

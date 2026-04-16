@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
@@ -40,7 +41,7 @@ public class AppointmentClientService {
                                                        String appointmentId,
                                                        String jwtToken) {
         validateBeforeStatusChange(doctorId, appointmentId, jwtToken);
-        updateAppointmentStatus(doctorId, appointmentId, jwtToken, "ACCEPTED");
+        confirmAppointmentOnService(appointmentId, jwtToken);
 
         return new AppointmentActionResponse(
                 appointmentId,
@@ -52,12 +53,12 @@ public class AppointmentClientService {
                                                        String appointmentId,
                                                        String jwtToken) {
         validateBeforeStatusChange(doctorId, appointmentId, jwtToken);
-        updateAppointmentStatus(doctorId, appointmentId, jwtToken, "REJECTED");
+        cancelAppointmentOnService(appointmentId, jwtToken);
 
         return new AppointmentActionResponse(
                 appointmentId,
-                "REJECTED",
-                "Appointment rejected by doctor " + doctorId);
+                "CANCELLED",
+                "Appointment rejected (cancelled) by doctor " + doctorId);
     }
 
     private void validateBeforeStatusChange(String doctorId, String appointmentId, String jwtToken) {
@@ -97,26 +98,27 @@ public class AppointmentClientService {
             log.warn("Appointment not found (404): appointmentId={}", appointmentId);
             throw new AppointmentNotFoundException("Appointment not found: " + appointmentId);
         } catch (HttpClientErrorException ex) {
-            log.error("Appointment Service returned error: status={}, body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
+            log.error("Appointment Service returned client error: status={}, body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
             throw new BadRequestException("Failed to fetch appointment: " + ex.getResponseBodyAsString());
+        } catch (HttpServerErrorException ex) {
+            log.error("Appointment Service returned server error: status={}, body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
+            throw new BadRequestException("Appointment Service error: " + ex.getResponseBodyAsString());
         } catch (RestClientException ex) {
             log.error("Appointment Service is not reachable: {}", ex.getMessage());
             throw new BadRequestException("Appointment Service is not reachable.");
         }
     }
 
-    private void updateAppointmentStatus(String doctorId,
-                                         String appointmentId,
-                                         String jwtToken,
-                                         String status) {
-        HttpEntity<AppointmentStatusUpdateRequest> entity = new HttpEntity<>(
-                new AppointmentStatusUpdateRequest(doctorId, status),
-                buildHeaders(jwtToken)
-        );
-
+    /**
+     * Calls PUT /api/appointments/{id}/accept on the Appointment Service.
+     * The Appointment Service extracts doctorId from the forwarded JWT.
+     */
+    private void confirmAppointmentOnService(String appointmentId, String jwtToken) {
+        HttpEntity<Void> entity = new HttpEntity<>(buildHeaders(jwtToken));
+        log.info("Accepting appointment on Appointment Service: PUT /api/appointments/{}/accept", appointmentId);
         try {
             appointmentRestTemplate.exchange(
-                    "/api/appointments/{id}/status",
+                    "/api/appointments/{id}/accept",
                     HttpMethod.PUT,
                     entity,
                     Void.class,
@@ -125,8 +127,46 @@ public class AppointmentClientService {
         } catch (HttpClientErrorException.NotFound ex) {
             throw new AppointmentNotFoundException("Appointment not found: " + appointmentId);
         } catch (HttpClientErrorException ex) {
-            throw new BadRequestException("Failed to update appointment status: " + ex.getResponseBodyAsString());
+            log.error("Appointment Service error on accept: status={}, body={}",
+                    ex.getStatusCode(), ex.getResponseBodyAsString());
+            throw new BadRequestException("Failed to accept appointment: " + ex.getResponseBodyAsString());
+        } catch (HttpServerErrorException ex) {
+            log.error("Appointment Service server error on accept: status={}, body={}",
+                    ex.getStatusCode(), ex.getResponseBodyAsString());
+            throw new BadRequestException("Appointment Service error on accept: " + ex.getResponseBodyAsString());
         } catch (RestClientException ex) {
+            log.error("Appointment Service unreachable on accept: {}", ex.getMessage());
+            throw new BadRequestException("Appointment Service is not reachable.");
+        }
+    }
+
+    /**
+     * Calls PUT /api/appointments/{id}/cancel on the Appointment Service.
+     * Used when a doctor rejects — maps to a CANCELLED status.
+     */
+    private void cancelAppointmentOnService(String appointmentId, String jwtToken) {
+        HttpEntity<Void> entity = new HttpEntity<>(buildHeaders(jwtToken));
+        log.info("Cancelling appointment on Appointment Service: PUT /api/appointments/{}/cancel", appointmentId);
+        try {
+            appointmentRestTemplate.exchange(
+                    "/api/appointments/{id}/cancel",
+                    HttpMethod.PUT,
+                    entity,
+                    Void.class,
+                    appointmentId
+            );
+        } catch (HttpClientErrorException.NotFound ex) {
+            throw new AppointmentNotFoundException("Appointment not found: " + appointmentId);
+        } catch (HttpClientErrorException ex) {
+            log.error("Appointment Service error on cancel: status={}, body={}",
+                    ex.getStatusCode(), ex.getResponseBodyAsString());
+            throw new BadRequestException("Failed to cancel appointment: " + ex.getResponseBodyAsString());
+        } catch (HttpServerErrorException ex) {
+            log.error("Appointment Service server error on cancel: status={}, body={}",
+                    ex.getStatusCode(), ex.getResponseBodyAsString());
+            throw new BadRequestException("Appointment Service error on cancel: " + ex.getResponseBodyAsString());
+        } catch (RestClientException ex) {
+            log.error("Appointment Service unreachable on cancel: {}", ex.getMessage());
             throw new BadRequestException("Appointment Service is not reachable.");
         }
     }
@@ -139,6 +179,4 @@ public class AppointmentClientService {
     }
 
     record AppointmentDetailsResponse(String id, String doctorId, String status) {}
-
-    record AppointmentStatusUpdateRequest(String doctorId, String status) {}
 }
