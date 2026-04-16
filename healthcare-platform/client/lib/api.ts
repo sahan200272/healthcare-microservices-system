@@ -67,6 +67,8 @@ export const appointmentApi = {
 
 // Patient API
 export const patientApi = {
+  createProfile: (profileData: any) => 
+    api.post("/api/patients", profileData),
   getProfile: (patientId: string) => 
     api.get(`/api/patients/${patientId}`),
   updateProfile: (patientId: string, profileData: any) => 

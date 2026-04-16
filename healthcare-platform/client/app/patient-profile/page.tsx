@@ -41,15 +41,16 @@ interface Prescription {
 export default function PatientProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState({
-    name: "",
-    email: "",
+    name: typeof window !== "undefined" ? (localStorage.getItem("name") ?? "") : "",
+    email: typeof window !== "undefined" ? (localStorage.getItem("email") ?? "") : "",
     phone: "",
     address: "",
-    dateOfBirth: "",
+    age: "",
     gender: "",
     bloodType: "",
     allergies: "",
   });
+  const [isNewProfile, setIsNewProfile] = useState(false);
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
@@ -57,14 +58,27 @@ export default function PatientProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
 
-  const patientId = typeof window !== "undefined" ? localStorage.getItem("id") : "";
+  const patientId = typeof window !== "undefined" ? (localStorage.getItem("id") ?? "") : "";
+  const userName = typeof window !== "undefined" ? (localStorage.getItem("name") ?? "") : "";
+  const userEmail = typeof window !== "undefined" ? (localStorage.getItem("email") ?? "") : "";
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
         if (patientId) {
           const profileResponse = await patientApi.getProfile(patientId);
-          setProfile(profileResponse.data);
+          const data = profileResponse.data || {};
+          setProfile({
+            name: data.fullName || userName,
+            email: userEmail,
+            phone: data.phone || "",
+            address: data.address || "",
+            age: data.age?.toString() || "",
+            gender: data.gender || "",
+            bloodType: data.bloodGroup || "",
+            allergies: data.emergencyContact || "",
+          });
+          setIsNewProfile(false);
 
           const docsResponse = await patientApi.getDocuments(patientId);
           setDocuments(docsResponse.data || []);
@@ -74,6 +88,12 @@ export default function PatientProfilePage() {
         }
       } catch (error) {
         console.error("Failed to load profile:", error);
+        setIsNewProfile(true);
+        setProfile(prev => ({
+          ...prev,
+          name: userName,
+          email: userEmail
+        }));
       }
     };
 
@@ -112,7 +132,22 @@ export default function PatientProfilePage() {
 
   const handleSaveProfile = async () => {
     try {
-      await patientApi.updateProfile(patientId, profile);
+      const payload = {
+        fullName: profile.name,
+        age: parseInt(profile.age) || 0,
+        gender: profile.gender || "Not Specified",
+        phone: profile.phone || "0000000000",
+        address: profile.address,
+        bloodGroup: profile.bloodType,
+        emergencyContact: profile.allergies,
+      };
+
+      if (isNewProfile) {
+        await patientApi.createProfile(payload);
+        setIsNewProfile(false);
+      } else {
+        await patientApi.updateProfile(patientId, payload);
+      }
       setEditMode(false);
       alert("Profile updated successfully!");
     } catch (error) {
@@ -267,22 +302,43 @@ export default function PatientProfilePage() {
                   )}
                 </div>
 
-                {/* Allergies */}
+                {/* Age */}
                 <div>
                   <label className="block text-sm font-bold text-clinical-gray mb-2 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
-                    Allergies
+                    <Calendar className="w-4 h-4" />
+                    Age
                   </label>
                   {editMode ? (
                     <input
-                      type="text"
-                      value={profile.allergies}
-                      onChange={(e) => setProfile({ ...profile, allergies: e.target.value })}
-                      placeholder="e.g., Penicillin, Nuts..."
+                      type="number"
+                      value={profile.age}
+                      onChange={(e) => setProfile({ ...profile, age: e.target.value })}
                       className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
                     />
                   ) : (
-                    <p className="text-clinical-dark dark:text-clinical-white">{profile.allergies || "--"}</p>
+                    <p className="text-clinical-dark dark:text-clinical-white">{profile.age || "--"}</p>
+                  )}
+                </div>
+
+                {/* Gender */}
+                <div>
+                  <label className="block text-sm font-bold text-clinical-gray mb-2 flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    Gender
+                  </label>
+                  {editMode ? (
+                    <select
+                      value={profile.gender}
+                      onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  ) : (
+                    <p className="text-clinical-dark dark:text-clinical-white">{profile.gender || "--"}</p>
                   )}
                 </div>
               </div>
