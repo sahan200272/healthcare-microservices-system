@@ -52,17 +52,21 @@ export const telemedicineApi = {
 // Appointment API
 export const appointmentApi = {
   searchDoctors: (params: { specialty?: string; search?: string }) => 
-    api.get("/api/appointments/doctors", { params }),
+    api.get("/api/doctors", { params }),
   getDoctor: (doctorId: string) => 
-    api.get(`/api/appointments/doctors/${doctorId}`),
+    api.get(`/api/doctors/${doctorId}`),
   bookAppointment: (appointmentData: any) => 
-    api.post("/api/appointments/book", appointmentData),
+    api.post("/api/appointments", appointmentData),
   getAppointments: (userId: string, role: "patient" | "doctor") => 
     api.get(`/api/appointments/${role}/${userId}`),
   updateAppointmentStatus: (appointmentId: string, status: string) => 
     api.put(`/api/appointments/${appointmentId}/status`, { status }),
+  confirmAppointment: (appointmentId: string) => 
+    api.put(`/api/appointments/${appointmentId}/confirm`, {}),
   cancelAppointment: (appointmentId: string) => 
     api.put(`/api/appointments/${appointmentId}/cancel`, {}),
+  rescheduleAppointment: (appointmentId: string, request: { appointmentDate: string, timeSlot: string }) => 
+    api.put(`/api/appointments/${appointmentId}/reschedule`, request),
 };
 
 // Patient API
