@@ -18,7 +18,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
-import { appointmentApi } from "@/lib/api";
+import { appointmentApi, patientApi } from "@/lib/api";
 
 interface Appointment {
   id: string;
@@ -43,11 +43,11 @@ export default function DoctorDashboard() {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<"pending" | "confirmed">("pending");
 
-  // Fetch appointments
+  // Fetch appointments then resolve patient names
   useEffect(() => {
     const loadAppointments = async () => {
       try {
-        const doctorId = localStorage.getItem("id"); // Align with login page
+        const doctorId = localStorage.getItem("id");
         const name = localStorage.getItem("name");
         const email = localStorage.getItem("email");
 
@@ -63,39 +63,55 @@ export default function DoctorDashboard() {
           return;
         }
 
-        // Fetch appointments from API
+        // Step 1: Load appointments
         const response = await appointmentApi.getAppointments(doctorId, "doctor");
-        if (response.data) {
-          setAppointments(response.data);
-          // Auto-switch tab if no pending items
-          const pendingCount = response.data.filter((a: any) => a.status === 'PENDING').length;
-          if (pendingCount === 0) setActiveTab("confirmed");
+        const rawAppointments: Appointment[] = response.data ?? [];
+
+        // Step 2: Collect unique patientIds that don't already have a name
+        const missingIds = [
+          ...new Set(
+            rawAppointments
+              .filter((a) => !a.patientName || a.patientName.trim() === "")
+              .map((a) => a.patientId)
+          ),
+        ];
+
+        // Step 3: Batch-fetch patient profiles for missing names
+        const nameMap = new Map<string, string>();
+        if (missingIds.length > 0) {
+          const results = await Promise.allSettled(
+            missingIds.map((pid) => patientApi.getProfile(pid))
+          );
+          results.forEach((result, i) => {
+            if (result.status === "fulfilled") {
+              const profile = result.value.data;
+              const fullName =
+                profile?.fullName ||
+                profile?.name ||
+                `${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`.trim();
+              if (fullName) nameMap.set(missingIds[i], fullName);
+            }
+          });
         }
+
+        // Step 4: Merge resolved names back into appointments
+        const enriched = rawAppointments.map((a) => ({
+          ...a,
+          patientName:
+            (a.patientName && a.patientName.trim()) ||
+            nameMap.get(a.patientId) ||
+            "Unknown Patient",
+        }));
+
+        setAppointments(enriched);
+
+        // Auto-switch tab if no pending items
+        const pendingCount = enriched.filter((a) => a.status === "PENDING").length;
+        if (pendingCount === 0) setActiveTab("confirmed");
       } catch (err: any) {
         console.error("Error loading appointments:", err);
-        setError("Failed to load real-time appointments. Showing demo data.");
-        
-        // Mock data fallback
-        setAppointments([
-          {
-            id: "1",
-            patientId: "pat1",
-            patientName: "John Doe",
-            appointmentDate: "2026-04-20",
-            timeSlot: "09:00 AM",
-            status: "PENDING",
-            reason: "Persistent cough",
-          },
-          {
-            id: "2",
-            patientId: "pat2",
-            patientName: "Alice Smith",
-            appointmentDate: "2026-04-21",
-            timeSlot: "11:00 AM",
-            status: "CONFIRMED",
-            reason: "Follow-up",
-          },
-        ]);
+        setError("Failed to load appointments.");
+        setAppointments([]);
       } finally {
         setIsLoading(false);
       }
@@ -235,10 +251,11 @@ export default function DoctorDashboard() {
                       <User className="w-8 h-8" />
                     </div>
                     <div>
-                      <h4 className="text-xl font-bold text-clinical-dark dark:text-clinical-white transition-colors group-hover:text-brand-primary">{apt.patientName}</h4>
+                      <h4 className="text-xl font-bold text-clinical-dark dark:text-clinical-white transition-colors group-hover:text-brand-primary">
+                        {apt.patientName || "Unknown Patient"}
+                      </h4>
                       <p className="text-sm text-clinical-gray mt-1 flex items-center gap-2">
-                         <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md">ID: {apt.patientId.substring(0, 8)}...</span>
-                         {apt.reason && <span className="truncate max-w-[200px]">• {apt.reason}</span>}
+                         {apt.reason && <span className="truncate max-w-[280px]">{apt.reason}</span>}
                       </p>
                       <div className="flex items-center gap-4 mt-3">
                         <span className="flex items-center gap-1.5 text-xs font-bold text-clinical-dark dark:text-clinical-white">

@@ -17,7 +17,7 @@ import {
   CheckCircle2,
   RefreshCw,
 } from "lucide-react";
-import { appointmentApi, doctorApi } from "@/lib/api";
+import { appointmentApi, doctorApi, patientApi } from "@/lib/api";
 import StatsCard from "@/app/components/doctor/StatsCard";
 import type { Appointment, PrescriptionResponse } from "@/lib/doctorTypes";
 
@@ -52,9 +52,34 @@ export default function DoctorDashboardPage() {
         doctorApi.getAppointments(doctorId),
         doctorApi.getDoctorPrescriptions(doctorId),
       ]);
-      setAppointments(
-        apptRes.status === "fulfilled" ? apptRes.value.data ?? [] : []
+
+      const rawAppointments: Appointment[] =
+        apptRes.status === "fulfilled" ? apptRes.value.data ?? [] : [];
+
+      // patientId in appointments = auth-service userId.
+      // Resolve unique userIds → fullName via patient-service.
+      const uniquePatientIds = [...new Set(rawAppointments.map((a) => a.patientId).filter(Boolean))];
+      const nameMap = new Map<string, string>();
+
+      await Promise.allSettled(
+        uniquePatientIds.map(async (userId) => {
+          try {
+            const pRes = await patientApi.getProfileByUserId(userId);
+            const profile = pRes.data;
+            const name = profile?.fullName || profile?.name || "";
+            if (name) nameMap.set(userId, name);
+          } catch {
+            // Silently skip — appointment shows fallback
+          }
+        })
       );
+
+      const enriched = rawAppointments.map((a) => ({
+        ...a,
+        patientName: nameMap.get(a.patientId) || a.patientName || "Unknown Patient",
+      }));
+
+      setAppointments(enriched);
       setPrescriptions(
         rxRes.status === "fulfilled" ? rxRes.value.data ?? [] : []
       );
@@ -91,6 +116,13 @@ export default function DoctorDashboardPage() {
     () => prescriptions.slice(0, 3),
     [prescriptions]
   );
+
+  // appointmentId → patientName map derived from already-loaded appointments
+  const patientNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    appointments.forEach((a) => { if (a.id && a.patientName) map.set(a.id, a.patientName); });
+    return map;
+  }, [appointments]);
 
   return (
     <div className="px-8 py-8 space-y-8">
@@ -273,6 +305,9 @@ export default function DoctorDashboardPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-clinical-dark dark:text-clinical-white truncate">
                         {rx.diagnosis}
+                      </p>
+                      <p className="text-[11px] text-clinical-gray truncate">
+                        {patientNameMap.get(rx.appointmentId) || ""}
                       </p>
                       <p className="text-[11px] text-clinical-gray">
                         {rx.issuedAt
