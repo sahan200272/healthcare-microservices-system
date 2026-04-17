@@ -13,6 +13,7 @@ import {
   Stethoscope,
   AlertCircle,
   CheckCircle2,
+  XCircle,
   Loader2,
   Trash2,
   RefreshCcw,
@@ -20,7 +21,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
-import { appointmentApi } from "@/lib/api";
+import { appointmentApi, patientApi } from "@/lib/api";
 
 interface Appointment {
   id: string;
@@ -49,24 +50,35 @@ export default function PatientDashboard() {
   useEffect(() => {
     const loadAppointments = async () => {
       try {
-        const patientId = localStorage.getItem("id"); // Align with login page
+        const userId = localStorage.getItem("id"); // Align with login page
         const name = localStorage.getItem("name");
         const email = localStorage.getItem("email");
 
-        setUserDetails({
-          name: name || "Patient",
-          email: email || "patient@example.com",
-          id: patientId,
-        });
-
-        if (!patientId) {
+        if (!userId) {
           setError("Patient ID not found. Please log in again.");
           setIsLoading(false);
           return;
         }
 
+        // Fetch actual patient ID
+        let realPatientId = userId;
+        try {
+          const profileRes = await patientApi.getProfileByUserId(userId);
+          if (profileRes.data?.patientId) {
+            realPatientId = profileRes.data.patientId;
+          }
+        } catch (err) {
+          console.warn("Could not fetch real patient ID, falling back to userId");
+        }
+
+        setUserDetails({
+          name: name || "Patient",
+          email: email || "patient@example.com",
+          id: realPatientId,
+        });
+
         // Fetch appointments from API
-        const response = await appointmentApi.getAppointments(patientId, "patient");
+        const response = await appointmentApi.getAppointments(realPatientId, "patient");
         if (response.data) {
           setAppointments(response.data);
         }
@@ -118,8 +130,8 @@ export default function PatientDashboard() {
 
   const filteredAppointments = appointments.filter(apt => {
     if (activeTab === "pending") return apt.status === "PENDING";
-    if (activeTab === "confirmed") return apt.status === "CONFIRMED" || apt.status === "ACTIVE";
-    if (activeTab === "history") return apt.status === "COMPLETED" || apt.status === "CANCELLED";
+    if (activeTab === "confirmed") return apt.status === "CONFIRMED" || apt.status === "ACTIVE" || apt.status === "ACCEPTED";
+    if (activeTab === "history") return apt.status === "COMPLETED" || apt.status === "CANCELLED" || apt.status === "REJECTED";
     return false;
   });
 
@@ -166,7 +178,7 @@ export default function PatientDashboard() {
               </div>
               <h3 className="font-bold text-clinical-dark dark:text-clinical-white">Confirmed</h3>
             </div>
-            <p className="text-3xl font-bold text-brand-primary">{appointments.filter(a => a.status === 'CONFIRMED').length}</p>
+            <p className="text-3xl font-bold text-brand-primary">{appointments.filter(a => a.status === 'CONFIRMED' || a.status === 'ACTIVE' || a.status === 'ACCEPTED').length}</p>
             <p className="text-sm text-clinical-gray">Ready for visitation</p>
           </motion.div>
 
@@ -251,23 +263,27 @@ export default function PatientDashboard() {
                   </div>
 
                   <div className="flex items-center gap-3 self-end md:self-auto">
-                    <button 
-                      onClick={() => router.push(`/doctors/${apt.doctorId}/book?reschedule=${apt.id}`)}
-                      className="p-3 text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all flex items-center gap-2 text-sm font-bold"
-                      title="Reschedule"
-                    >
-                      <RefreshCcw className="w-4 h-4" />
-                      <span className="hidden sm:inline">Reschedule</span>
-                    </button>
-                    <button 
-                      onClick={() => handleCancelAppointment(apt.id)}
-                      className="p-3 text-red-500 hover:bg-red-500/10 rounded-xl transition-all flex items-center gap-2 text-sm font-bold"
-                      title="Cancel"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span className="hidden sm:inline">Cancel</span>
-                    </button>
-                    {apt.status === 'CONFIRMED' && (
+                    {!(apt.status === 'COMPLETED' || apt.status === 'CANCELLED' || apt.status === 'REJECTED') && (
+                      <>
+                        <button 
+                          onClick={() => router.push(`/doctors/${apt.doctorId}/book?reschedule=${apt.id}`)}
+                          className="p-3 text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all flex items-center gap-2 text-sm font-bold"
+                          title="Reschedule"
+                        >
+                          <RefreshCcw className="w-4 h-4" />
+                          <span className="hidden sm:inline">Reschedule</span>
+                        </button>
+                        <button 
+                          onClick={() => handleCancelAppointment(apt.id)}
+                          className="p-3 text-red-500 hover:bg-red-500/10 rounded-xl transition-all flex items-center gap-2 text-sm font-bold"
+                          title="Cancel"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span className="hidden sm:inline">Cancel</span>
+                        </button>
+                      </>
+                    )}
+                    {(apt.status === 'CONFIRMED' || apt.status === 'ACCEPTED' || apt.status === 'ACTIVE') && (
                        <span className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ml-2">
                         <CheckCircle2 className="w-4 h-4" /> Confirmed
                        </span>
@@ -275,6 +291,16 @@ export default function PatientDashboard() {
                     {apt.status === 'PENDING' && (
                        <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ml-2">
                         <Clock className="w-4 h-4" /> Pending
+                       </span>
+                    )}
+                    {apt.status === 'COMPLETED' && (
+                       <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ml-2">
+                        <CheckCircle2 className="w-4 h-4" /> Completed
+                       </span>
+                    )}
+                    {(apt.status === 'CANCELLED' || apt.status === 'REJECTED') && (
+                       <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ml-2">
+                        <XCircle className="w-4 h-4" /> {apt.status === 'REJECTED' ? 'Rejected' : 'Cancelled'}
                        </span>
                     )}
                   </div>

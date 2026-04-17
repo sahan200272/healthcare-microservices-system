@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, User, LogOut, LayoutDashboard, Video, Stethoscope, FileText, Settings, ShieldAlert, Brain, Calendar } from "lucide-react";
+import { Activity, User, LogOut, LayoutDashboard, Stethoscope, FileText, Settings, ShieldAlert, Brain, Calendar } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -58,8 +58,9 @@ export default function Navbar() {
     if (role === "DOCTOR") {
       return [
         ...baseLinks,
+        { href: "/doctor/appointments", label: "Appointments", icon: Calendar },
+        { href: "/doctor/prescriptions", label: "Prescriptions", icon: FileText },
         { href: "/doctor/management", label: "My Profile", icon: Settings },
-        { href: "/video", label: "Consultations", icon: Video },
       ];
     }
 
