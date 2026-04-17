@@ -17,6 +17,9 @@ public class Prescription {
 
     private String doctorId;
 
+    // Denormalized doctor name for patient-facing display
+    private String doctorName;
+
     // References Patient Service
     private String patientId;
 
