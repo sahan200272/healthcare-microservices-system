@@ -54,6 +54,12 @@ public class DoctorService {
         return toResponse(doctor);
     }
 
+    public DoctorResponse getDoctorByUserId(String userId) {
+        Doctor doctor = doctorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor profile not found for userId: " + userId));
+        return toResponse(doctor);
+    }
+
     public DoctorResponse updateDoctor(String doctorId, DoctorUpdateRequest request, String currentUserId) {
         Doctor doctor = findDoctorOrThrow(doctorId);
 

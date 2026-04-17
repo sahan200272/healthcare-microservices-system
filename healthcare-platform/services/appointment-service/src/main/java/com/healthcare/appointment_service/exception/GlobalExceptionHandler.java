@@ -3,6 +3,7 @@ package com.healthcare.appointment_service.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -30,6 +31,40 @@ public class GlobalExceptionHandler {
                 .fieldErrors(fields)
                 .build();
         return ResponseEntity.badRequest().body(body);
+    }
+
+    // Must be declared before handleRuntime so Spring picks the more specific type first.
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
+        ApiError body = ApiError.builder()
+                .timestamp(Instant.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .error(HttpStatus.FORBIDDEN.getReasonPhrase())
+                .message("Access denied: " + ex.getMessage())
+                .path(request.getRequestURI())
+                .fieldErrors(null)
+                .build();
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ApiError> handleRuntime(RuntimeException ex, HttpServletRequest request) {
+        // Covers inter-service communication failures (e.g. "Doctor Service is not reachable")
+        // thrown as plain RuntimeException by service clients.
+        // Return 502 so the caller (e.g. doctor-service) can distinguish this from a 4xx logic error.
+        if (ex instanceof BadRequestException || ex instanceof ConflictException
+                || ex instanceof ForbiddenException || ex instanceof NotFoundException) {
+            return handleKnown(ex, request);
+        }
+        ApiError body = ApiError.builder()
+                .timestamp(Instant.now())
+                .status(HttpStatus.BAD_GATEWAY.value())
+                .error(HttpStatus.BAD_GATEWAY.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .fieldErrors(null)
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(body);
     }
 
     @ExceptionHandler({BadRequestException.class, ConflictException.class, ForbiddenException.class, NotFoundException.class})

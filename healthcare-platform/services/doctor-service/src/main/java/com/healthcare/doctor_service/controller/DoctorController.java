@@ -55,6 +55,16 @@ public class DoctorController {
     }
 
     /**
+     * GET /api/doctors/user/{userId}
+     * Look up a doctor profile by their auth-service userId.
+     * Used by other services (e.g. Appointment Service) to resolve userId → doctorId.
+     */
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<DoctorResponse> getDoctorByUserId(@PathVariable String userId) {
+        return ResponseEntity.ok(doctorService.getDoctorByUserId(userId));
+    }
+
+    /**
      * PATCH /api/doctors/{id}
      * Partially update doctor profile. Only the owning doctor can update their own profile.
      * Only non-null fields in the request body will be applied.
