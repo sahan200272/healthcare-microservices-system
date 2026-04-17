@@ -78,7 +78,7 @@ export default function AdminDashboardPage() {
 
   const handleVerifyDoctor = async (doctorId: string) => {
     try {
-      await adminApi.verifyDoctor(doctorId);
+      await adminApi.verifyDoctor(doctorId, { status: "verified" });
       setPendingDoctors(pendingDoctors.filter((d) => d.id !== doctorId));
       alert("Doctor verified successfully!");
     } catch (error) {

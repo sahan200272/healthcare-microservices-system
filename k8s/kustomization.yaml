@@ -1,0 +1,87 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: healthcare
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - rbac.yaml
+  - api-gateway.yaml
+  - auth-service-new.yaml
+  - appointment-service.yaml
+  - doctor-service.yaml
+  - patient-service.yaml
+  - telemedicine-service.yaml
+  - notification-service.yaml
+  - payment-service.yaml
+  - ai-symptom-service.yaml
+  - client.yaml
+  - ingress.yaml
+
+# Common labels applied to all resources
+commonLabels:
+  app: healthcare-platform
+  version: v1
+  managed-by: kustomize
+
+# Common annotations
+commonAnnotations:
+  description: "Healthcare Microservices Platform"
+  maintainer: "Development Team"
+
+# Image configurations
+images:
+  - name: api-gateway
+    newName: api-gateway
+    newTag: latest
+  - name: auth-service
+    newName: auth-service
+    newTag: latest
+  - name: appointment-service
+    newName: appointment-service
+    newTag: latest
+  - name: doctor-service
+    newName: doctor-service
+    newTag: latest
+  - name: patient-service
+    newName: patient-service
+    newTag: latest
+  - name: telemedicine-service
+    newName: telemedicine-service
+    newTag: latest
+  - name: notification-service
+    newName: notification-service
+    newTag: latest
+  - name: payment-service
+    newName: payment-service
+    newTag: latest
+  - name: ai-symptom-service
+    newName: ai-symptom-service
+    newTag: latest
+  - name: healthcare-client
+    newName: healthcare-client
+    newTag: latest
+
+# Replicas configuration
+replicas:
+  - name: api-gateway
+    count: 2
+  - name: auth-service
+    count: 2
+  - name: appointment-service
+    count: 2
+  - name: doctor-service
+    count: 2
+  - name: patient-service
+    count: 2
+  - name: telemedicine-service
+    count: 2
+  - name: notification-service
+    count: 2
+  - name: payment-service
+    count: 2
+  - name: ai-symptom-service
+    count: 2
+  - name: client
+    count: 2
