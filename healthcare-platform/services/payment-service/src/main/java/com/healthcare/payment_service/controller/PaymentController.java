@@ -8,11 +8,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/payments")
+@RequestMapping("/api/payments")
 @RequiredArgsConstructor
 public class PaymentController {
 
@@ -31,5 +32,16 @@ public class PaymentController {
     @GetMapping("/patient/{patientId}")
     public ResponseEntity<List<Payment>> getPaymentsByPatientId(@PathVariable String patientId) {
         return ResponseEntity.ok(paymentService.getPaymentsByPatientId(patientId));
+    }
+
+    @PostMapping("/verify")
+    public ResponseEntity<Payment> verifyPayment(@RequestParam String sessionId) {
+        return ResponseEntity.ok(paymentService.verifyStripePayment(sessionId));
+    }
+
+    @GetMapping("/appointment/{appointmentId}")
+    public ResponseEntity<Payment> getPaymentByAppointmentId(@PathVariable String appointmentId) {
+        Payment payment = paymentService.getPaymentByAppointmentId(appointmentId);
+        return payment != null ? ResponseEntity.ok(payment) : ResponseEntity.notFound().build();
     }
 }

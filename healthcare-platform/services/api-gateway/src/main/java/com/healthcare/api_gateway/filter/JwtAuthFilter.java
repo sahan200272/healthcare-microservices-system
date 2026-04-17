@@ -19,7 +19,6 @@ public class JwtAuthFilter implements GlobalFilter {
 
     private final JwtUtil jwtUtil;
 
-    // All paths that do NOT need a token
     private static final List<String> PUBLIC_PATHS = List.of(
             "/api/auth/login",
             "/api/auth/register",

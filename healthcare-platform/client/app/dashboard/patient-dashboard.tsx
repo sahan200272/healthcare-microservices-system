@@ -18,9 +18,10 @@ import {
   RefreshCcw,
   History,
   ChevronRight,
+  CreditCard,
 } from "lucide-react";
 import Link from "next/link";
-import { appointmentApi } from "@/lib/api";
+import { appointmentApi, paymentApi } from "@/lib/api";
 
 interface Appointment {
   id: string;
@@ -30,6 +31,7 @@ interface Appointment {
   appointmentDate: string;
   timeSlot: string;
   status: string;
+  paid?: boolean;
 }
 
 export default function PatientDashboard() {
@@ -67,34 +69,41 @@ export default function PatientDashboard() {
 
         // Fetch appointments from API
         const response = await appointmentApi.getAppointments(patientId, "patient");
-        if (response.data) {
-          setAppointments(response.data);
+        let fetchedAppointments = response.data || [];
+
+        // Fetch matching payments to check "paid" status
+        try {
+          const paymentsRes = await paymentApi.getPaymentsByPatientId(patientId);
+          const payments = paymentsRes.data || [];
+
+          // Map paid status to appointments
+          fetchedAppointments = fetchedAppointments.map((apt: any) => {
+            const hasMatch = payments.some((p: any) =>
+              String(p.appointmentId).trim() === String(apt.id).trim() &&
+              p.paymentStatus === "COMPLETED"
+            );
+            return {
+              ...apt,
+              paid: hasMatch
+            };
+          });
+        } catch (payErr) {
+          console.warn("Could not fetch payments for status sync", payErr);
+        }
+
+        setAppointments(fetchedAppointments);
+
+        // Auto-switch to Requested tab ONLY if no Confirmed AND no Paid appointments exist
+        const confirmedCount = fetchedAppointments.filter((a: any) => a.status === 'CONFIRMED' || a.status === 'ACTIVE' || a.paid).length;
+        const pendingCount = fetchedAppointments.filter((a: any) => (a.status === 'PENDING' || a.status === 'REQUESTED') && !a.paid).length;
+
+        if (confirmedCount === 0 && pendingCount > 0) {
+          setActiveTab("pending");
         }
       } catch (err: any) {
         console.error("Error loading appointments:", err);
-        setError("Failed to load your real-time appointments. Showing demo data.");
-        
-        // Mock data fallback
-        setAppointments([
-          {
-            id: "1",
-            doctorId: "doc1",
-            doctorName: "Dr. Sarah Johnson",
-            speciality: "General Practitioner",
-            appointmentDate: "2026-04-20",
-            timeSlot: "09:00 AM",
-            status: "CONFIRMED",
-          },
-          {
-            id: "2",
-            doctorId: "doc2",
-            doctorName: "Dr. Michael Chen",
-            speciality: "Cardiologist",
-            appointmentDate: "2026-04-22",
-            timeSlot: "02:00 PM",
-            status: "PENDING",
-          },
-        ]);
+        setError("Failed to load your appointments. Please ensure all services are running.");
+        setAppointments([]);
       } finally {
         setIsLoading(false);
       }
@@ -105,7 +114,7 @@ export default function PatientDashboard() {
 
   const handleCancelAppointment = async (appointmentId: string) => {
     if (!confirm("Are you sure you want to cancel this appointment?")) return;
-    
+
     try {
       await appointmentApi.cancelAppointment(appointmentId);
       setAppointments(prev => prev.filter(apt => apt.id !== appointmentId));
@@ -117,8 +126,8 @@ export default function PatientDashboard() {
   };
 
   const filteredAppointments = appointments.filter(apt => {
-    if (activeTab === "pending") return apt.status === "PENDING";
-    if (activeTab === "confirmed") return apt.status === "CONFIRMED" || apt.status === "ACTIVE";
+    if (activeTab === "pending") return (apt.status === "PENDING" || apt.status === "REQUESTED") && !apt.paid;
+    if (activeTab === "confirmed") return apt.status === "CONFIRMED" || apt.status === "ACTIVE" || apt.paid;
     if (activeTab === "history") return apt.status === "COMPLETED" || apt.status === "CANCELLED";
     return false;
   });
@@ -166,7 +175,9 @@ export default function PatientDashboard() {
               </div>
               <h3 className="font-bold text-clinical-dark dark:text-clinical-white">Confirmed</h3>
             </div>
-            <p className="text-3xl font-bold text-brand-primary">{appointments.filter(a => a.status === 'CONFIRMED').length}</p>
+            <p className="text-3xl font-bold text-brand-primary">
+              {appointments.filter(a => a.status === 'CONFIRMED' || a.status === 'ACTIVE' || a.paid).length}
+            </p>
             <p className="text-sm text-clinical-gray">Ready for visitation</p>
           </motion.div>
 
@@ -177,7 +188,9 @@ export default function PatientDashboard() {
               </div>
               <h3 className="font-bold text-clinical-dark dark:text-clinical-white">Awaiting Approval</h3>
             </div>
-            <p className="text-3xl font-bold text-yellow-500">{appointments.filter(a => a.status === 'PENDING').length}</p>
+            <p className="text-3xl font-bold text-yellow-500">
+              {appointments.filter(a => (a.status === 'PENDING' || a.status === 'REQUESTED') && !a.paid).length}
+            </p>
             <p className="text-sm text-clinical-gray">Pending doctor's review</p>
           </motion.div>
 
@@ -195,19 +208,19 @@ export default function PatientDashboard() {
 
         {/* Tab Controls */}
         <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1.5 rounded-2xl mb-8 w-max">
-          <button 
+          <button
             onClick={() => setActiveTab("confirmed")}
             className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "confirmed" ? "bg-white dark:bg-slate-700 shadow-sm text-brand-primary" : "text-clinical-gray"}`}
           >
             Confirmed
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab("pending")}
             className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "pending" ? "bg-white dark:bg-slate-700 shadow-sm text-brand-primary" : "text-clinical-gray"}`}
           >
             Requested
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab("history")}
             className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "history" ? "bg-white dark:bg-slate-700 shadow-sm text-brand-primary" : "text-clinical-gray"}`}
           >
@@ -251,7 +264,7 @@ export default function PatientDashboard() {
                   </div>
 
                   <div className="flex items-center gap-3 self-end md:self-auto">
-                    <button 
+                    <button
                       onClick={() => router.push(`/doctors/${apt.doctorId}/book?reschedule=${apt.id}`)}
                       className="p-3 text-brand-primary hover:bg-brand-primary/10 rounded-xl transition-all flex items-center gap-2 text-sm font-bold"
                       title="Reschedule"
@@ -259,7 +272,7 @@ export default function PatientDashboard() {
                       <RefreshCcw className="w-4 h-4" />
                       <span className="hidden sm:inline">Reschedule</span>
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleCancelAppointment(apt.id)}
                       className="p-3 text-red-500 hover:bg-red-500/10 rounded-xl transition-all flex items-center gap-2 text-sm font-bold"
                       title="Cancel"
@@ -267,15 +280,34 @@ export default function PatientDashboard() {
                       <Trash2 className="w-4 h-4" />
                       <span className="hidden sm:inline">Cancel</span>
                     </button>
-                    {apt.status === 'CONFIRMED' && (
-                       <span className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ml-2">
-                        <CheckCircle2 className="w-4 h-4" /> Confirmed
-                       </span>
+                    {(apt.status === 'CONFIRMED' || apt.status === 'ACTIVE') && (
+                      <>
+                        <span className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ml-2">
+                          <CheckCircle2 className="w-4 h-4" /> Confirmed
+                        </span>
+                        {apt.paid ? (
+                          <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ml-2">
+                            <CheckCircle2 className="w-4 h-4" /> payment done
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => window.location.href = `/payments?appointmentId=${apt.id}&doctorId=${apt.doctorId}`}
+                            className="bg-brand-primary text-white hover:bg-brand-primary/90 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md ml-2"
+                          >
+                            Pay Fee
+                          </button>
+                        )}
+                      </>
                     )}
-                    {apt.status === 'PENDING' && (
-                       <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ml-2">
+                    {apt.status === 'PENDING' && apt.paid && (
+                      <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ml-2">
+                        <CheckCircle2 className="w-4 h-4" /> payment done
+                      </span>
+                    )}
+                    {apt.status === 'PENDING' && !apt.paid && (
+                      <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ml-2">
                         <Clock className="w-4 h-4" /> Pending
-                       </span>
+                      </span>
                     )}
                   </div>
                 </motion.div>
@@ -285,27 +317,39 @@ export default function PatientDashboard() {
         </div>
 
         {/* Footer Actions */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
-           <Link href="/patient-profile" className="glass p-8 rounded-3xl flex items-center gap-6 group">
-              <div className="w-14 h-14 bg-brand-secondary/10 rounded-2xl flex items-center justify-center text-brand-secondary group-hover:scale-110 transition-transform">
-                <History className="w-7 h-7" />
-              </div>
-              <div>
-                <h4 className="font-bold text-clinical-dark dark:text-clinical-white">Medical History</h4>
-                <p className="text-sm text-clinical-gray">View your past reports and prescriptions</p>
-              </div>
-              <ChevronRight className="w-6 h-6 text-slate-300 ml-auto group-hover:translate-x-1 transition-transform" />
-           </Link>
-           <Link href="/symptom-checker" className="glass p-8 rounded-3xl flex items-center gap-6 group">
-              <div className="w-14 h-14 bg-brand-primary/10 rounded-2xl flex items-center justify-center text-brand-primary group-hover:scale-110 transition-transform">
-                <Activity className="w-7 h-7" />
-              </div>
-              <div>
-                <h4 className="font-bold text-clinical-dark dark:text-clinical-white">Symptom Checker</h4>
-                <p className="text-sm text-clinical-gray">Quickly analyze your symptoms with AI</p>
-              </div>
-              <ChevronRight className="w-6 h-6 text-slate-300 ml-auto group-hover:translate-x-1 transition-transform" />
-           </Link>
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Link href="/payments/history" className="glass p-8 rounded-3xl flex items-center gap-6 group border border-blue-500/10 hover:border-blue-500/30 transition-all">
+            <div className="w-14 h-14 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+              <CreditCard className="w-7 h-7" />
+            </div>
+            <div>
+              <h4 className="font-bold text-clinical-dark dark:text-clinical-white">Payment History</h4>
+              <p className="text-sm text-clinical-gray">View receipts and past invoices</p>
+            </div>
+            <ChevronRight className="w-6 h-6 text-slate-300 ml-auto group-hover:translate-x-1 transition-transform" />
+          </Link>
+
+          <Link href="/patient-profile" className="glass p-8 rounded-3xl flex items-center gap-6 group">
+            <div className="w-14 h-14 bg-brand-secondary/10 rounded-2xl flex items-center justify-center text-brand-secondary group-hover:scale-110 transition-transform">
+              <History className="w-7 h-7" />
+            </div>
+            <div>
+              <h4 className="font-bold text-clinical-dark dark:text-clinical-white">Medical History</h4>
+              <p className="text-sm text-clinical-gray">View your past reports and prescriptions</p>
+            </div>
+            <ChevronRight className="w-6 h-6 text-slate-300 ml-auto group-hover:translate-x-1 transition-transform" />
+          </Link>
+
+          <Link href="/symptom-checker" className="glass p-8 rounded-3xl flex items-center gap-6 group">
+            <div className="w-14 h-14 bg-brand-primary/10 rounded-2xl flex items-center justify-center text-brand-primary group-hover:scale-110 transition-transform">
+              <Activity className="w-7 h-7" />
+            </div>
+            <div>
+              <h4 className="font-bold text-clinical-dark dark:text-clinical-white">Symptom Checker</h4>
+              <p className="text-sm text-clinical-gray">Quickly analyze your symptoms with AI</p>
+            </div>
+            <ChevronRight className="w-6 h-6 text-slate-300 ml-auto group-hover:translate-x-1 transition-transform" />
+          </Link>
         </div>
       </div>
     </div>
