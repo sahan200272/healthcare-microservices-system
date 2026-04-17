@@ -51,14 +51,15 @@ export default function VideoConsultationPage() {
     const loadSession = async () => {
       try {
         const response = await telemedicineApi.getSessionInfo(sessionId);
-        setSessionInfo(response.data);
+        // getSessionInfo returns VideoSession; cast to the local SessionInfo shape
+        setSessionInfo(response.data as unknown as SessionInfo);
 
         // Mark session as started
         await telemedicineApi.startSession(sessionId);
         setIsSessionActive(true);
 
         // Initialize Jitsi Meet
-        initializeJitsi(response.data);
+        initializeJitsi(response.data as unknown as SessionInfo);
       } catch (error) {
         console.error("Failed to load session:", error);
         alert("Failed to load consultation room");
