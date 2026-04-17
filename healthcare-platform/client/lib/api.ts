@@ -40,11 +40,48 @@ export const authApi = {
   register: (userData: any) => api.post("/api/auth/register", userData),
 };
 
+export interface VideoSession {
+  id?: string;
+  appointmentId: string;
+  patientId?: string;
+  doctorId?: string;
+  roomName?: string;
+  meetingUrl: string;
+  status: string; // "CREATED" | "ACTIVE" | "COMPLETED"
+  createdAt?: string;
+  startedAt?: string;
+  endedAt?: string;
+}
+
+export interface SessionActivateResponse {
+  sessionId: string;
+  appointmentId: string;
+  meetingUrl: string;
+  status: string;
+}
+
 export const telemedicineApi = {
-  getSessions: (userId: string, role: "patient" | "doctor") => 
+  getSessions: (userId: string, role: "patient" | "doctor") =>
     api.get(`/api/sessions/${role}/${userId}`),
   createSession: (sessionData: any) => api.post("/api/sessions/create", sessionData),
-  getSessionInfo: (appointmentId: string) => api.get(`/api/sessions/appointment/${appointmentId}`),
+
+  /** Fetch the video session for a given appointment (used by patient & doctor) */
+  getVideoSession: (appointmentId: string) =>
+    api.get<VideoSession>(`/api/sessions/appointment/${appointmentId}`),
+
+  /** @deprecated use getVideoSession instead */
+  getSessionInfo: (appointmentId: string) =>
+    api.get<VideoSession>(`/api/sessions/appointment/${appointmentId}`),
+
+  /**
+   * Called by the doctor's "Start Consultation" button.
+   * POST /api/sessions/{appointmentId}/activate
+   * Returns { sessionId, appointmentId, meetingUrl, status: "ACTIVE" }
+   */
+  activateSession: (appointmentId: string) =>
+    api.post<SessionActivateResponse>(`/api/sessions/${appointmentId}/activate`),
+
+  /** Legacy — start by session ID */
   startSession: (sessionId: string) => api.put(`/api/sessions/${sessionId}/start`),
   endSession: (sessionId: string) => api.put(`/api/sessions/${sessionId}/end`),
 };
@@ -184,9 +221,21 @@ export const adminApi = {
     api.get("/api/admin/transactions"),
 };
 
+// Prescription API — reads from the Doctor Service's authoritative prescriptions collection
+export const prescriptionApi = {
+  /**
+   * GET /api/doctors/prescriptions/patient/{patientId}
+   * Returns all prescriptions for a given patient directly from the Doctor Service.
+   * This is used by the Patient profile page as the primary source so that even
+   * legacy prescriptions (pre-mirror) are visible.
+   */
+  getByPatientId: (patientId: string) =>
+    api.get(`/api/doctors/prescriptions/patient/${patientId}`),
+};
+
 // AI Symptom Checker API
 export const aiSymptomApi = {
-  analyzeSympstoms: (symptoms: string[]) => 
+  analyzeSymptoms: (symptoms: string[]) =>
     api.post("/api/ai/symptom-checker", { symptoms }),
   getRecommendedSpecialties: (symptoms: string[]) => 
     api.post("/api/ai/recommended-specialties", { symptoms }),
