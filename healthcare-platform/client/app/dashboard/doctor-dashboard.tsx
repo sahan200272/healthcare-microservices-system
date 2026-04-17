@@ -120,7 +120,7 @@ export default function DoctorDashboard() {
 
   const filteredAppointments = appointments.filter(apt => {
     if (activeTab === "pending") return apt.status === "PENDING";
-    if (activeTab === "confirmed") return apt.status === "CONFIRMED" || apt.status === "ACTIVE";
+    if (activeTab === "confirmed") return apt.status === "CONFIRMED" || apt.status === "ACCEPTED" || apt.status === "ACTIVE";
     return false;
   });
 
@@ -180,7 +180,7 @@ export default function DoctorDashboard() {
                 <span className="text-xs font-bold text-clinical-gray uppercase tracking-widest">Confirmed Today</span>
              </div>
              <p className="text-3xl font-bold text-green-500">
-                {appointments.filter(a => a.status === 'CONFIRMED' && a.appointmentDate === new Date().toISOString().split('T')[0]).length}
+                {appointments.filter(a => (a.status === 'CONFIRMED' || a.status === 'ACCEPTED') && a.appointmentDate === new Date().toISOString().split('T')[0]).length}
              </p>
           </div>
           <div className="glass p-6 rounded-3xl border border-blue-500/10">

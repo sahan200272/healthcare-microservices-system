@@ -33,6 +33,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Public: browse all doctors and availability without auth
                         // NOTE: requestMatchers uses Ant patterns — use * not {id} for wildcards
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/doctors").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/doctors/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/doctors/*/availability").permitAll()

@@ -192,16 +192,23 @@ public class AppointmentService {
         }
     }
 
-    public List<AppointmentResponse> getDoctorAppointments(String doctorId) {
+    public List<AppointmentResponse> getDoctorAppointments(String doctorId, String userId, String jwtToken) {
         log.debug("🔍 Querying appointments for doctorId: {}", doctorId);
         
+        // userId (JWT) ≠ doctorId (Doctor._id) — must resolve via Doctor Service
+        String ownedDoctorId = doctorServiceClient.getDoctorIdByUserId(userId, jwtToken);
+        if (!doctorId.equals(ownedDoctorId) && !doctorId.equals(userId)) {
+            throw new ForbiddenException("You can only access appointments for your own doctor profile");
+        }
+
         try {
             if (appointmentRepository == null) {
                 log.error("❌ appointmentRepository is null");
                 return Collections.emptyList();
             }
             
-            List<Appointment> appointments = appointmentRepository.findByDoctorId(doctorId);
+            // Use the verified ownedDoctorId regardless of what the client passed in
+            List<Appointment> appointments = appointmentRepository.findByDoctorId(ownedDoctorId);
             
             if (appointments == null) {
                 log.warn("⚠️  appointmentRepository.findByDoctorId() returned null for doctorId: {}", doctorId);

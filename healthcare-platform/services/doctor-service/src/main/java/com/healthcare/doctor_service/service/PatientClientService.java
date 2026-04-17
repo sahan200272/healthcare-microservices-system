@@ -87,7 +87,7 @@ public class PatientClientService {
 
     /**
      * Fetches patient details by the Auth Service user ID.
-     * [INTEGRATION POINT] Calls: GET /api/patients/user/{userId}
+     * [INTEGRATION POINT] Calls: GET /api/patients/by-user/{userId}
      */
     public PatientDetailsResponse getPatientByUserId(String userId, String jwtToken) {
         if (simulateMode) {
@@ -98,7 +98,7 @@ public class PatientClientService {
 
         try {
             return patientWebClient.get()
-                    .uri("/api/patients/user/{userId}", userId)
+                    .uri("/api/patients/by-user/{userId}", userId)
                     .header("Authorization", "Bearer " + jwtToken)
                     .retrieve()
                     .bodyToMono(PatientDetailsResponse.class)

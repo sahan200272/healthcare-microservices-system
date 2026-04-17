@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.bson.types.ObjectId;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -23,6 +25,13 @@ public class PrescriptionService {
     private final AppointmentClientService appointmentClientService;
 
     public PrescriptionResponse issuePrescription(String doctorId, PrescriptionRequest request, String jwtToken) {
+        String patientId = request.getPatientId();
+        log.info("Using patientId: {}", patientId);
+        
+        if (!ObjectId.isValid(patientId)) {
+            throw new IllegalArgumentException("Invalid patientId");
+        }
+
         // Ensure doctor exists and is verified
         var doctor = doctorService.findDoctorOrThrow(doctorId);
         if (!doctor.isVerified()) {
