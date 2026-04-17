@@ -40,8 +40,30 @@ function PrescriptionsContent() {
   const fetchPrescriptions = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await doctorApi.getDoctorPrescriptions(doctorId);
-      setPrescriptions(res.data ?? []);
+      // Fetch prescriptions and appointments in parallel so we can resolve patient names
+      const [rxRes, apptRes] = await Promise.allSettled([
+        doctorApi.getDoctorPrescriptions(doctorId),
+        doctorApi.getAppointments(doctorId),
+      ]);
+
+      const rawRx: PrescriptionResponse[] =
+        rxRes.status === "fulfilled" ? rxRes.value.data ?? [] : [];
+
+      // Build appointmentId → patientName lookup from appointments
+      const nameMap = new Map<string, string>();
+      if (apptRes.status === "fulfilled") {
+        (apptRes.value.data ?? []).forEach((apt: import("@/lib/doctorTypes").Appointment) => {
+          if (apt.id && apt.patientName) nameMap.set(apt.id, apt.patientName);
+        });
+      }
+
+      // Enrich each prescription with the resolved patient name
+      const enriched = rawRx.map((rx) => ({
+        ...rx,
+        patientName: nameMap.get(rx.appointmentId) ?? rx.patientId,
+      }));
+
+      setPrescriptions(enriched);
     } catch {
       setPrescriptions([]);
     } finally {
@@ -193,7 +215,7 @@ function PrescriptionCard({
           </div>
           <div className="flex items-center gap-3 mt-1 flex-wrap">
             <span className="flex items-center gap-1 text-xs text-clinical-gray">
-              <User className="w-3 h-3" /> Patient: {rx.patientId}
+              <User className="w-3 h-3" /> {rx.patientName || rx.patientId}
             </span>
             <span className="flex items-center gap-1 text-xs text-clinical-gray">
               <Calendar className="w-3 h-3" />
@@ -255,8 +277,8 @@ function PrescriptionCard({
                 </div>
               </div>
               {rx.notes && (
-                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl px-4 py-3 text-sm text-clinical-gray">
-                  <span className="font-bold text-clinical-dark dark:text-clinical-white">Notes: </span>
+                <div className="bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-3 text-sm text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                  <span className="font-bold text-clinical-dark dark:text-white">Notes: </span>
                   {rx.notes}
                 </div>
               )}

@@ -14,7 +14,7 @@ import {
   Stethoscope,
   Video,
 } from "lucide-react";
-import { appointmentApi, doctorApi, telemedicineApi, paymentApi, notificationApi, patientApi } from "@/lib/api";
+import { appointmentApi, doctorApi, telemedicineApi, paymentApi, notificationApi } from "@/lib/api";
 import Link from "next/link";
 
 interface TimeSlot {
@@ -47,7 +47,6 @@ export default function BookAppointmentPage() {
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [appointmentId, setAppointmentId] = useState("");
 
-  const [patientId, setPatientId] = useState<string>("");
   const userId = typeof window !== "undefined" ? localStorage.getItem("id") || "" : "";
 
   // ...
@@ -55,16 +54,12 @@ export default function BookAppointmentPage() {
   useEffect(() => {
     const fetchDoctorAndPatientData = async () => {
       try {
-        const [doctorRes, availabilityRes, patientRes] = await Promise.all([
+        const [doctorRes, availabilityRes] = await Promise.all([
           appointmentApi.getDoctor(doctorId),
           doctorApi.getAvailability(doctorId),
-          userId ? patientApi.getProfileByUserId(userId) : Promise.resolve({ data: { patientId: "" } }),
         ]);
         setDoctor(doctorRes.data);
         setAvailability(availabilityRes.data || []);
-        if (patientRes.data?.patientId) {
-          setPatientId(patientRes.data.patientId);
-        }
       } catch (error) {
         console.error("Failed to fetch data:", error);
       }
@@ -73,7 +68,7 @@ export default function BookAppointmentPage() {
     if (doctorId) {
       fetchDoctorAndPatientData();
     }
-  }, [doctorId, userId]);
+  }, [doctorId]);
 
   // Generate time slots when date selection changes
   useEffect(() => {
@@ -118,9 +113,8 @@ export default function BookAppointmentPage() {
           timeSlot: formattedTimeSlot,
         });
       } else {
-        // Create new appointment
+        // Create new appointment — patientId is derived from the JWT on the backend
         appointmentResponse = await appointmentApi.bookAppointment({
-          patientId,
           doctorId,
           appointmentDate: selectedDate,
           timeSlot: formattedTimeSlot,
@@ -139,7 +133,6 @@ export default function BookAppointmentPage() {
       try {
         await notificationApi.sendAppointmentConfirmation({
           appointmentId: newAppointmentId,
-          patientId,
           doctorId,
           email: localStorage.getItem("email"),
           phone: localStorage.getItem("phone"),

@@ -26,7 +26,10 @@ public class SecurityConfig {
                         // Only DOCTOR or PATIENT can create a session
                         .requestMatchers("/api/sessions/create").hasAnyRole("DOCTOR", "PATIENT")
 
-                        // Only DOCTOR can start or end a session
+                        // Only DOCTOR can activate (start) a session by appointmentId
+                        .requestMatchers("/api/sessions/*/activate").hasRole("DOCTOR")
+
+                        // Only DOCTOR can start or end a session by sessionId (legacy)
                         .requestMatchers("/api/sessions/*/start").hasRole("DOCTOR")
                         .requestMatchers("/api/sessions/*/end").hasRole("DOCTOR")
 
@@ -36,7 +39,7 @@ public class SecurityConfig {
                         // DOCTOR can view their own sessions
                         .requestMatchers("/api/sessions/doctor/**").hasRole("DOCTOR")
 
-                        // ADMIN can view any session
+                        // ADMIN, DOCTOR, and PATIENT can view session by appointmentId
                         .requestMatchers("/api/sessions/appointment/**").hasAnyRole("ADMIN", "DOCTOR", "PATIENT")
 
                         // All other requests must be authenticated

@@ -31,8 +31,12 @@ public class AppointmentController {
     @PreAuthorize("hasRole('PATIENT')")
     @PostMapping
     public ResponseEntity<AppointmentResponse> create(@Valid @RequestBody AppointmentRequest request) {
-        log.info("📝 Creating appointment for patient: {}", request.getPatientId());
-        enforceSelfIfPresent(request.getPatientId());
+        // Always derive patientId from the JWT — never trust the client-supplied value.
+        // The JWT userId (auth-service UUID) is the canonical identity for ownership checks.
+        String authenticatedUserId = SecurityUtils.currentUserId()
+                .orElseThrow(() -> new ForbiddenException("Missing userId claim in JWT"));
+        request.setPatientId(authenticatedUserId);
+        log.info("📝 Creating appointment for patient (from JWT): {}", authenticatedUserId);
         AppointmentResponse response = appointmentService.createAppointment(request);
         log.info("✅ Appointment created: {}", response.getId());
         return ResponseEntity.ok(response);

@@ -11,7 +11,7 @@ import java.time.LocalDate;
 @Data
 public class AppointmentRequest {
 
-    @NotBlank
+    // Derived from JWT on the backend — client should not supply this value.
     private String patientId;
 
     @NotBlank
@@ -35,7 +35,7 @@ public class AppointmentRequest {
      */
     private String consultationType;
 
-    public @NotBlank String getPatientId() {
+    public String getPatientId() {
         return patientId;
     }
 
@@ -55,7 +55,7 @@ public class AppointmentRequest {
         return reason;
     }
 
-    public void setPatientId(@NotBlank String patientId) {
+    public void setPatientId(String patientId) {
         this.patientId = patientId;
     }
 

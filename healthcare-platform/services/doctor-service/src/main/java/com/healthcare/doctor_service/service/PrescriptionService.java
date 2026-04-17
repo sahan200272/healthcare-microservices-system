@@ -67,6 +67,7 @@ public class PrescriptionService {
 
         Prescription prescription = new Prescription();
         prescription.setDoctorId(doctorId);
+        prescription.setDoctorName(doctor.getFullName() != null ? doctor.getFullName() : "Unknown Doctor");
         prescription.setPatientId(request.getPatientId());
         prescription.setAppointmentId(request.getAppointmentId());
         prescription.setDiagnosis(request.getDiagnosis());
@@ -78,12 +79,32 @@ public class PrescriptionService {
         );
 
         Prescription saved = prescriptionRepository.save(prescription);
+
+        // Mirror to Patient Service so patients can see their prescriptions
+        try {
+            patientClientService.mirrorPrescriptionToPatientService(saved, saved.getDoctorName(), jwtToken);
+        } catch (Exception ex) {
+            log.warn("Prescription mirror to Patient Service failed (non-fatal): {}", ex.getMessage());
+        }
+
         return toResponse(saved);
     }
 
     public List<PrescriptionResponse> getPrescriptionsByDoctor(String doctorId) {
         doctorService.findDoctorOrThrow(doctorId);
         return prescriptionRepository.findByDoctorId(doctorId)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns all prescriptions for a given patient, fetched directly from
+     * the Doctor Service's authoritative collection.
+     * Used by the patient-facing GET endpoint as the primary/fallback source.
+     */
+    public List<PrescriptionResponse> getPrescriptionsByPatient(String patientId) {
+        return prescriptionRepository.findByPatientId(patientId)
                 .stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
@@ -103,6 +124,7 @@ public class PrescriptionService {
         PrescriptionResponse response = new PrescriptionResponse();
         response.setPrescriptionId(prescription.getPrescriptionId());
         response.setDoctorId(prescription.getDoctorId());
+        response.setDoctorName(prescription.getDoctorName());
         response.setPatientId(prescription.getPatientId());
         response.setAppointmentId(prescription.getAppointmentId());
         response.setDiagnosis(prescription.getDiagnosis());

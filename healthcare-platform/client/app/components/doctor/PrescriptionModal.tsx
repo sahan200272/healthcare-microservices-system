@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   X,
@@ -13,7 +13,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import type { Medication, PrescriptionRequest } from "@/lib/doctorTypes";
-import { doctorApi } from "@/lib/api";
+import { doctorApi, patientApi } from "@/lib/api";
 
 interface PrescriptionModalProps {
   isOpen: boolean;
@@ -74,6 +74,41 @@ export default function PrescriptionModal({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  /**
+   * The appointment document stores patientId = auth-service userId (a string UUID).
+   * The patient-service backend expects the MongoDB _id (ObjectId as string).
+   * We resolve the real _id once when the modal opens via GET /api/patients/by-user/{userId}.
+   */
+  const [resolvedPatientId, setResolvedPatientId] = useState<string | null>(null);
+  const [resolvingPatient, setResolvingPatient] = useState(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || !patientId) return;
+
+    // Reset resolution state each time the modal opens
+    setResolvedPatientId(null);
+    setResolveError(null);
+    setResolvingPatient(true);
+
+    patientApi
+      .getProfileByUserId(patientId)
+      .then((res) => {
+        // The patient document's MongoDB _id is returned as `id` or `_id`
+        const mongoId: string =
+          res.data?.id ?? res.data?._id ?? res.data?.patientId ?? null;
+        if (!mongoId) {
+          setResolveError("Could not determine patient record ID.");
+        } else {
+          setResolvedPatientId(mongoId);
+        }
+      })
+      .catch(() => {
+        setResolveError("Failed to load patient record. Please close and try again.");
+      })
+      .finally(() => setResolvingPatient(false));
+  }, [isOpen, patientId]);
+
   const addMedication = () => {
     setMedications((prev) => [...prev, { ...EMPTY_MED }]);
   };
@@ -104,8 +139,17 @@ export default function PrescriptionModal({
     setError(null);
     if (!validate()) return;
 
+    // Guard: ensure we have resolved the correct MongoDB _id before submitting
+    if (!resolvedPatientId) {
+      setError(
+        resolveError ??
+        "Patient record is still loading. Please wait a moment and try again."
+      );
+      return;
+    }
+
     const request: PrescriptionRequest = {
-      patientId,
+      patientId: resolvedPatientId,   // ← MongoDB _id, NOT the auth userId
       appointmentId,
       diagnosis,
       medications,
@@ -176,7 +220,16 @@ export default function PrescriptionModal({
                     <h2 className="text-lg font-bold text-clinical-dark dark:text-clinical-white">
                       Issue Prescription
                     </h2>
-                    <p className="text-xs text-clinical-gray">Patient: <span className="font-semibold text-brand-primary">{patientName}</span></p>
+                    <p className="text-xs text-clinical-gray">
+                    Patient:{" "}
+                    <span className="font-semibold text-brand-primary">{patientName}</span>
+                    {resolvingPatient && (
+                      <span className="ml-2 text-clinical-gray animate-pulse">(resolving…)</span>
+                    )}
+                    {resolveError && !resolvingPatient && (
+                      <span className="ml-2 text-red-500 text-xs">{resolveError}</span>
+                    )}
+                  </p>
                   </div>
                 </div>
                 <button

@@ -86,7 +86,16 @@ public class AppointmentService {
         Appointment saved = appointmentRepository.save(appointment);
         log.info("✅ [AppointmentService] Appointment saved to DB with ID: {}", saved.getId());
         log.info("   Consultation Type (raw): '{}'", saved.getConsultationType());
-        log.info("   Consultation Type (length): {}", saved.getConsultationType() != null ? saved.getConsultationType().length() : "null");
+
+        // ── Mark the slot as booked in the Doctor Service ─────────────────────────────────
+        // This updates the bookedSlots[] in the availability document so the time-slot
+        // can no longer be booked by another patient. Done AFTER persisting the appointment
+        // so we never lose the record; the doctor-service uses $addToSet (idempotent + atomic).
+        doctorServiceClient.markSlotBooked(
+                saved.getDoctorId(),
+                saved.getAppointmentDate(),
+                saved.getTimeSlot()
+        );
 
         // Create video session if this is a video consultation (case-insensitive)
         if ("VIDEO_CONSULTATION".equalsIgnoreCase(saved.getConsultationType())) {

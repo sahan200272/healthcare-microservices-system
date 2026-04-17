@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { patientApi } from "@/lib/api";
+import { patientApi, prescriptionApi } from "@/lib/api";
 
 interface MedicalReport {
   reportId: string;
@@ -35,11 +35,23 @@ interface MedicalReport {
 
 interface Prescription {
   prescriptionId: string;
-  doctorName: string;
+  doctorId?: string;
+  doctorName?: string;
   diagnosis: string;
-  medicines: string[];
-  notes: string;
-  prescribedAt: string;
+  // Rich structure from doctor-service
+  medications?: Array<{
+    name: string;
+    dosage: string;
+    frequency: string;
+    duration: string;
+    instructions?: string;
+  }>;
+  // Flat structure from patient-service (fallback)
+  medicines?: string[];
+  notes?: string;
+  // issuedAt from doctor-service, prescribedAt from patient-service
+  issuedAt?: string;
+  prescribedAt?: string;
 }
 
 interface MedicalHistory {
@@ -126,9 +138,24 @@ export default function PatientProfilePage() {
           if (data.patientId) {
             const reportsResponse = await patientApi.getReports(data.patientId);
             setReports(reportsResponse.data || []);
-            
-            const prescsResponse = await patientApi.getPrescriptions(data.patientId);
-            setPrescriptions(prescsResponse.data || []);
+
+            // Fetch prescriptions from the Doctor Service (authoritative source)
+            // so that ALL prescriptions — including ones issued before the
+            // patient-service mirroring was added — are visible to the patient.
+            try {
+              const prescsResponse = await prescriptionApi.getByPatientId(data.patientId);
+              setPrescriptions(prescsResponse.data || []);
+            } catch (prescsErr) {
+              // Fallback: try patient-service endpoint
+              console.warn("Doctor-service prescription fetch failed, falling back to patient-service:", prescsErr);
+              try {
+                const prescsResponse = await patientApi.getPrescriptions(data.patientId);
+                setPrescriptions(prescsResponse.data || []);
+              } catch (fallbackErr) {
+                console.error("Both prescription sources failed:", fallbackErr);
+                setPrescriptions([]);
+              }
+            }
 
             const historyResponse = await patientApi.getMedicalHistory(data.patientId);
             setMedicalHistory(historyResponse.data || []);
@@ -680,11 +707,11 @@ export default function PatientProfilePage() {
                       <div className="flex justify-between items-start mb-4">
                         <div>
                           <p className="font-bold text-clinical-dark dark:text-clinical-white text-lg">
-                            Dr. {presc.doctorName}
+                            {presc.doctorName ? `Dr. ${presc.doctorName}` : "Doctor"}
                           </p>
                           <p className="text-sm text-clinical-gray flex items-center gap-2">
                             <Clock className="w-4 h-4" />
-                            {new Date(presc.prescribedAt).toLocaleDateString()}
+                            {new Date(presc.issuedAt || presc.prescribedAt || "").toLocaleDateString()}
                           </p>
                         </div>
                         <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all">
@@ -700,9 +727,18 @@ export default function PatientProfilePage() {
                         <div>
                           <p className="text-sm font-bold text-clinical-gray mb-2">Medicines:</p>
                           <ul className="text-sm text-clinical-dark dark:text-clinical-white space-y-1 mb-4">
-                            {presc.medicines.map((med, idx) => (
-                              <li key={idx}>• {med}</li>
-                            ))}
+                            {/* Render rich medication objects from doctor-service */}
+                            {presc.medications && presc.medications.length > 0
+                              ? presc.medications.map((med, idx) => (
+                                  <li key={idx} className="flex flex-col py-1">
+                                    <span className="font-semibold">• {med.name} — {med.dosage}</span>
+                                    <span className="text-xs text-clinical-gray ml-4">{med.frequency}, {med.duration}{med.instructions ? ` — ${med.instructions}` : ""}</span>
+                                  </li>
+                                ))
+                              : (presc.medicines || []).map((med, idx) => (
+                                  <li key={idx}>• {med}</li>
+                                ))
+                            }
                           </ul>
                         </div>
 

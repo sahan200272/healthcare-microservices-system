@@ -13,7 +13,7 @@ import {
   RefreshCw,
   Loader2,
 } from "lucide-react";
-import { appointmentApi, doctorApi } from "@/lib/api";
+import { appointmentApi, doctorApi, patientApi } from "@/lib/api";
 import AppointmentCard from "@/app/components/doctor/AppointmentCard";
 import Toast, { useToast } from "@/app/components/doctor/Toast";
 import type { Appointment, AppointmentStatus } from "@/lib/doctorTypes";
@@ -39,7 +39,33 @@ export default function DoctorAppointmentsPage() {
     setLoading(true);
     try {
       const res = await doctorApi.getAppointments(doctorId);
-      setAppointments(res.data ?? []);
+      const rawAppointments: Appointment[] = res.data ?? [];
+
+      // The patientId stored in appointments equals the auth-service userId.
+      // Resolve each unique userId → patient fullName via the patient service.
+      const uniquePatientIds = [...new Set(rawAppointments.map((a) => a.patientId).filter(Boolean))];
+      const nameMap = new Map<string, string>();
+
+      await Promise.allSettled(
+        uniquePatientIds.map(async (userId) => {
+          try {
+            const pRes = await patientApi.getProfileByUserId(userId);
+            const profile = pRes.data;
+            // Patient-service stores the name as fullName
+            const name = profile?.fullName || profile?.name || "";
+            if (name) nameMap.set(userId, name);
+          } catch {
+            // Silently skip — appointment will show fallback
+          }
+        })
+      );
+
+      const enriched = rawAppointments.map((a) => ({
+        ...a,
+        patientName: nameMap.get(a.patientId) || a.patientName || "Unknown Patient",
+      }));
+
+      setAppointments(enriched);
     } catch {
       setAppointments([]);
       addToast("Failed to load appointments.", "error");
@@ -47,6 +73,7 @@ export default function DoctorAppointmentsPage() {
       setLoading(false);
     }
   };
+
 
   const handleAccept = async (id: string) => {
     setActionLoading(id + "-accept");
@@ -129,7 +156,6 @@ export default function DoctorAppointmentsPage() {
     { label: "All",       value: "ALL",       count: counts.all,       color: "text-clinical-dark dark:text-clinical-white" },
     { label: "Pending",   value: "PENDING",   count: counts.pending,   color: "text-amber-500" },
     { label: "Confirmed", value: "CONFIRMED", count: counts.confirmed, color: "text-emerald-500" },
-    { label: "Completed", value: "COMPLETED", count: counts.completed, color: "text-blue-500" },
     { label: "Cancelled", value: "CANCELLED", count: counts.cancelled, color: "text-red-500" },
   ];
 

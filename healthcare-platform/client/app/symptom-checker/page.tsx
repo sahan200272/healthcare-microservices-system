@@ -9,22 +9,17 @@ import {
   AlertCircle,
   Stethoscope,
   Loader2,
+  RefreshCw,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { aiSymptomApi } from "@/lib/api";
 
-interface Recommendation {
-  specialty: string;
-  description: string;
-  relevance: number;
-  recommendedDoctors: number;
-}
-
+// Matches the backend SymptomAnalysisResponse DTO exactly
 interface AnalysisResult {
-  summary: string;
-  recommendations: Recommendation[];
-  urgencyLevel: "LOW" | "MEDIUM" | "HIGH";
-  message: string;
+  possibleConditions: string[];
+  severity: "Low" | "Moderate" | "High";
+  recommendedSpecialty: string;
 }
 
 const commonSymptoms = [
@@ -52,6 +47,7 @@ export default function SymptomCheckerPage() {
   const [showResults, setShowResults] = useState(false);
   const [results, setResults] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleAddSymptom = (symptom: string) => {
     if (!selectedSymptoms.includes(symptom)) {
@@ -72,33 +68,39 @@ export default function SymptomCheckerPage() {
 
   const handleAnalyze = async () => {
     if (selectedSymptoms.length === 0) {
-      alert("Please select at least one symptom");
+      setErrorMsg("Please select at least one symptom before analyzing.");
       return;
     }
 
     setLoading(true);
+    setErrorMsg(null);
     try {
-      const response = await aiSymptomApi.analyzeSympstoms(selectedSymptoms);
+      const response = await aiSymptomApi.analyzeSymptoms(selectedSymptoms);
       setResults(response.data);
       setShowResults(true);
-    } catch (error) {
-      console.error("Analysis failed:", error);
-      alert("Failed to analyze symptoms. Please try again.");
+    } catch (error: any) {
+      console.error("AI symptom analysis failed:", error);
+      const status = error?.response?.status;
+      // Provide helpful per-status messages
+      if (status === 502 || status === 503) {
+        setErrorMsg(
+          "The AI service is temporarily unavailable. Please wait a moment and try again."
+        );
+      } else if (status === 401 || status === 403) {
+        setErrorMsg("Session expired. Please log in again to use the symptom checker.");
+      } else {
+        const detail =
+          error?.response?.data?.detail ||
+          error?.response?.data?.error ||
+          error?.message ||
+          "Failed to analyze symptoms. Please try again.";
+        setErrorMsg(detail);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const getUrgencyColor = (level: string) => {
-    switch (level) {
-      case "HIGH":
-        return "bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50";
-      case "MEDIUM":
-        return "bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-900/50";
-      default:
-        return "bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900/50";
-    }
-  };
 
   return (
     <div className="min-h-screen pt-24 pb-12 px-6 bg-clinical-white dark:bg-clinical-dark">
@@ -124,6 +126,25 @@ export default function SymptomCheckerPage() {
             This is not a substitute for professional medical advice
           </p>
         </div>
+
+        {/* ── Inline error banner ── */}
+        {errorMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4 flex items-start gap-3"
+          >
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <p className="flex-1 text-red-700 dark:text-red-300 text-sm font-medium">{errorMsg}</p>
+            <button
+              onClick={() => setErrorMsg(null)}
+              className="text-red-400 hover:text-red-600 transition-colors"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
 
         {!showResults ? (
           <motion.div
@@ -218,7 +239,10 @@ export default function SymptomCheckerPage() {
               className="w-full bg-brand-primary hover:bg-brand-primary/90 disabled:bg-clinical-gray text-white py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2"
             >
               {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Analyzing&hellip; this may take a moment
+                </>
               ) : (
                 <>
                   <Brain className="w-5 h-5" />
@@ -229,54 +253,64 @@ export default function SymptomCheckerPage() {
           </motion.div>
         ) : results ? (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-            {/* Urgency Level */}
-            <div className={`rounded-3xl p-8 border-2 ${getUrgencyColor(results.urgencyLevel)}`}>
-              <h2 className="text-xl font-bold mb-2">Urgency Level: {results.urgencyLevel}</h2>
-              <p>{results.message}</p>
+
+            {/* Severity Badge */}
+            <div
+              className={`rounded-3xl p-8 border-2 ${
+                results.severity === "High"
+                  ? "bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50"
+                  : results.severity === "Moderate"
+                  ? "bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-900/50"
+                  : "bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900/50"
+              }`}
+            >
+              <h2 className="text-xl font-bold mb-2">Severity: {results.severity}</h2>
+              <p className="text-sm">
+                {results.severity === "High"
+                  ? "Seek medical attention promptly."
+                  : results.severity === "Moderate"
+                  ? "Consider scheduling a doctor's visit soon."
+                  : "Monitor your symptoms and rest."}
+              </p>
             </div>
 
-            {/* Summary */}
+            {/* Possible Conditions */}
             <div className="glass rounded-3xl p-8">
-              <h2 className="text-xl font-bold text-clinical-dark dark:text-clinical-white mb-4">Summary</h2>
-              <p className="text-clinical-gray">{results.summary}</p>
+              <h2 className="text-xl font-bold text-clinical-dark dark:text-clinical-white mb-4">
+                Possible Conditions
+              </h2>
+              <ul className="space-y-2">
+                {results.possibleConditions.map((condition, idx) => (
+                  <li key={idx} className="flex items-center gap-3 text-clinical-gray">
+                    <span className="w-2 h-2 rounded-full bg-brand-primary flex-shrink-0" />
+                    {condition}
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            {/* Recommendations */}
-            <div className="space-y-4">
-              <h2 className="text-2xl font-bold text-clinical-dark dark:text-clinical-white">
-                Recommended Specialists
+            {/* Recommended Specialty */}
+            <div className="glass rounded-3xl p-8">
+              <h2 className="text-xl font-bold text-clinical-dark dark:text-clinical-white mb-4">
+                Recommended Specialist
               </h2>
-              {results.recommendations.map((rec, idx) => (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.1 }}
-                  className="glass rounded-3xl p-6"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-lg font-bold text-clinical-dark dark:text-clinical-white flex items-center gap-2">
-                      <Stethoscope className="w-5 h-5 text-brand-primary" />
-                      {rec.specialty}
-                    </h3>
-                    <div className="bg-brand-primary/10 text-brand-primary px-3 py-1 rounded-full text-sm font-bold">
-                      {Math.round(rec.relevance * 100)}% Match
-                    </div>
-                  </div>
-                  <p className="text-clinical-gray mb-4">{rec.description}</p>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-clinical-gray">
-                      {rec.recommendedDoctors} doctors available in this specialty
-                    </p>
-                    <Link
-                      href={`/browse-doctors?specialty=${rec.specialty}`}
-                      className="inline-flex items-center gap-2 text-brand-primary hover:text-brand-primary/80 font-bold transition-colors"
-                    >
-                      Browse Doctors <ChevronRight className="w-4 h-4" />
-                    </Link>
-                  </div>
-                </motion.div>
-              ))}
+              <div className="flex items-center gap-4">
+                <div className="bg-brand-primary/10 p-4 rounded-2xl">
+                  <Stethoscope className="w-8 h-8 text-brand-primary" />
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-clinical-dark dark:text-clinical-white">
+                    {results.recommendedSpecialty}
+                  </p>
+                  <p className="text-clinical-gray text-sm">Based on your reported symptoms</p>
+                </div>
+              </div>
+              <Link
+                href={`/browse-doctors?specialty=${encodeURIComponent(results.recommendedSpecialty)}`}
+                className="mt-6 inline-flex items-center gap-2 text-brand-primary hover:text-brand-primary/80 font-bold transition-colors"
+              >
+                Browse {results.recommendedSpecialty} Doctors <ChevronRight className="w-4 h-4" />
+              </Link>
             </div>
 
             {/* New Analysis Button */}
@@ -285,9 +319,11 @@ export default function SymptomCheckerPage() {
                 setShowResults(false);
                 setSelectedSymptoms([]);
                 setResults(null);
+                setErrorMsg(null);
               }}
-              className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white py-4 rounded-2xl font-bold transition-all"
+              className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2"
             >
+              <RefreshCw className="w-5 h-5" />
               Start New Analysis
             </button>
           </motion.div>

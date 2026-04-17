@@ -37,6 +37,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/doctors").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/doctors/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/doctors/*/availability").permitAll()
+                        // Authenticated patients can read their own prescriptions from Doctor Service
+                        .requestMatchers(HttpMethod.GET, "/api/doctors/prescriptions/patient/*").authenticated()
+                        // Service-to-service calls from Appointment Service (no user JWT)
+                        .requestMatchers(HttpMethod.GET, "/api/doctors/*/availability/check").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/doctors/*/availability/book").permitAll()
                         // All other endpoints require authentication;
                         // fine-grained role checks are done via @PreAuthorize in controllers
                         .anyRequest().authenticated()

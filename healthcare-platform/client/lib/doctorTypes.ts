@@ -87,6 +87,7 @@ export interface PrescriptionResponse {
   prescriptionId: string;
   doctorId: string;
   patientId: string;
+  patientName?: string;  // Enriched client-side from appointments lookup
   appointmentId: string;
   diagnosis: string;
   medications: Medication[];
