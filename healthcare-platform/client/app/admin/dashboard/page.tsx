@@ -76,16 +76,17 @@ export default function AdminDashboardPage() {
     loadData();
   }, [userRoleFromStorage]);
 
-  const handleVerifyDoctor = async (doctorId: string) => {
-    try {
-      await adminApi.verifyDoctor(doctorId);
-      setPendingDoctors(pendingDoctors.filter((d) => d.id !== doctorId));
-      alert("Doctor verified successfully!");
-    } catch (error) {
-      console.error("Verification failed:", error);
-      alert("Failed to verify doctor");
-    }
-  };
+const handleVerifyDoctor = async (doctorId: string) => {
+  try {
+    await adminApi.verifyDoctor(doctorId, { status: "verified" });
+
+    setPendingDoctors(pendingDoctors.filter((d) => d.id !== doctorId));
+    alert("Doctor verified successfully!");
+  } catch (error) {
+    console.error("Verification failed:", error);
+    alert("Failed to verify doctor");
+  }
+};
 
   const handleRejectDoctor = async (doctorId: string) => {
     const reason = prompt("Enter rejection reason:");

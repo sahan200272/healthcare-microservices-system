@@ -13,6 +13,7 @@ import {
   Stethoscope,
   AlertCircle,
   CheckCircle2,
+  XCircle,
   Loader2,
   Trash2,
   RefreshCcw,
@@ -51,21 +52,32 @@ export default function PatientDashboard() {
   useEffect(() => {
     const loadAppointments = async () => {
       try {
-        const patientId = localStorage.getItem("id"); // Align with login page
+        const userId = localStorage.getItem("id"); // Align with login page
         const name = localStorage.getItem("name");
         const email = localStorage.getItem("email");
 
-        setUserDetails({
-          name: name || "Patient",
-          email: email || "patient@example.com",
-          id: patientId,
-        });
-
-        if (!patientId) {
+        if (!userId) {
           setError("Patient ID not found. Please log in again.");
           setIsLoading(false);
           return;
         }
+
+        // Fetch actual patient ID
+        let realPatientId = userId;
+        try {
+          const profileRes = await patientApi.getProfileByUserId(userId);
+          if (profileRes.data?.patientId) {
+            realPatientId = profileRes.data.patientId;
+          }
+        } catch (err) {
+          console.warn("Could not fetch real patient ID, falling back to userId");
+        }
+
+        setUserDetails({
+          name: name || "Patient",
+          email: email || "patient@example.com",
+          id: realPatientId,
+        });
 
         // Fetch appointments from API
         const response = await appointmentApi.getAppointments(patientId, "patient");
@@ -308,6 +320,16 @@ export default function PatientDashboard() {
                       <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ml-2">
                         <Clock className="w-4 h-4" /> Pending
                       </span>
+                    )}
+                    {apt.status === 'COMPLETED' && (
+                       <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ml-2">
+                        <CheckCircle2 className="w-4 h-4" /> Completed
+                       </span>
+                    )}
+                    {(apt.status === 'CANCELLED' || apt.status === 'REJECTED') && (
+                       <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ml-2">
+                        <XCircle className="w-4 h-4" /> {apt.status === 'REJECTED' ? 'Rejected' : 'Cancelled'}
+                       </span>
                     )}
                   </div>
                 </motion.div>

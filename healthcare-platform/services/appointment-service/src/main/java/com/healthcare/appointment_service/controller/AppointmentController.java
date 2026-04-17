@@ -76,10 +76,17 @@ public class AppointmentController {
     // 4. View Appointments by Doctor ID
     @PreAuthorize("hasRole('DOCTOR')")
     @GetMapping("/doctor/{doctorId}")
-    public ResponseEntity<List<AppointmentResponse>> getByDoctor(@PathVariable String doctorId) {
+    public ResponseEntity<List<AppointmentResponse>> getByDoctor(
+            @PathVariable String doctorId,
+            @RequestHeader("Authorization") String authHeader) {
         log.info("📋 Fetching appointments for doctor: {}", doctorId);
-        enforceSelfIfPresent(doctorId);
-        List<AppointmentResponse> appointments = appointmentService.getDoctorAppointments(doctorId);
+
+        String userId = SecurityUtils.currentUserId()
+                .orElseThrow(() -> new ForbiddenException("Missing userId claim in JWT"));
+        String token = authHeader.substring(7);
+
+        // Ownership is verified by the AppointmentService via the DoctorService
+        List<AppointmentResponse> appointments = appointmentService.getDoctorAppointments(doctorId, userId, token);
         log.info("✅ Retrieved {} appointments for doctor: {}", 
                 appointments != null ? appointments.size() : 0, doctorId);
         return ResponseEntity.ok(appointments);

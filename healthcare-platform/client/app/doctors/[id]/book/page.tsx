@@ -14,7 +14,7 @@ import {
   Stethoscope,
   Video,
 } from "lucide-react";
-import { appointmentApi, doctorApi, telemedicineApi, paymentApi, notificationApi } from "@/lib/api";
+import { appointmentApi, doctorApi, telemedicineApi, paymentApi, notificationApi, patientApi } from "@/lib/api";
 import Link from "next/link";
 
 interface TimeSlot {
@@ -47,26 +47,33 @@ export default function BookAppointmentPage() {
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [appointmentId, setAppointmentId] = useState("");
 
-  const patientId = typeof window !== "undefined" ? localStorage.getItem("id") : "";
+  const [patientId, setPatientId] = useState<string>("");
+  const userId = typeof window !== "undefined" ? localStorage.getItem("id") || "" : "";
+
+  // ...
 
   useEffect(() => {
-    const fetchDoctorData = async () => {
+    const fetchDoctorAndPatientData = async () => {
       try {
-        const [doctorRes, availabilityRes] = await Promise.all([
+        const [doctorRes, availabilityRes, patientRes] = await Promise.all([
           appointmentApi.getDoctor(doctorId),
-          doctorApi.getAvailability(doctorId)
+          doctorApi.getAvailability(doctorId),
+          userId ? patientApi.getProfileByUserId(userId) : Promise.resolve({ data: { patientId: "" } }),
         ]);
         setDoctor(doctorRes.data);
         setAvailability(availabilityRes.data || []);
+        if (patientRes.data?.patientId) {
+          setPatientId(patientRes.data.patientId);
+        }
       } catch (error) {
-        console.error("Failed to fetch doctor data:", error);
+        console.error("Failed to fetch data:", error);
       }
     };
 
     if (doctorId) {
-      fetchDoctorData();
+      fetchDoctorAndPatientData();
     }
-  }, [doctorId]);
+  }, [doctorId, userId]);
 
   // Generate time slots when date selection changes
   useEffect(() => {
