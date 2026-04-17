@@ -148,12 +148,14 @@ export const doctorApi = {
 
 // Payment API
 export const paymentApi = {
-  initiatePayment: (paymentData: any) => 
-    api.post("/api/payments/initiate", paymentData),
-  verifyPayment: (paymentId: string) => 
-    api.get(`/api/payments/${paymentId}/verify`),
-  getPaymentStatus: (transactionId: string) => 
-    api.get(`/api/payments/${transactionId}/status`),
+  createPayment: (paymentData: any) => 
+    api.post("/api/payments", paymentData),
+  verifyStripePayment: (sessionId: string) => 
+    api.post(`/api/payments/verify?sessionId=${sessionId}`),
+  getPaymentByAppointmentId: (appointmentId: string) => 
+    api.get(`/api/payments/appointment/${appointmentId}`),
+  getPaymentsByPatientId: (patientId: string) => 
+    api.get(`/api/payments/patient/${patientId}`),
 };
 
 // Notification API

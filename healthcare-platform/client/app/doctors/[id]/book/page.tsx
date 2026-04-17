@@ -132,18 +132,8 @@ export default function BookAppointmentPage() {
       const newAppointmentId = appointmentResponse.data.id;
       setAppointmentId(newAppointmentId);
 
-      // Initiate payment (simulated or actual if service exists)
-      try {
-        await paymentApi.initiatePayment({
-          appointmentId: newAppointmentId,
-          patientId,
-          doctorId,
-          amount: doctor?.consultationFee || 2000,
-          currency: "LKR",
-        });
-      } catch (err) {
-        console.warn("Payment initiation failed, but appointment created:", err);
-      }
+      // Payment is deliberately NOT initiated here. 
+      // It will be initiated after the doctor approves the appointment and the patient clicks "Pay Fee" on their dashboard.
 
       // Send notifications
       try {

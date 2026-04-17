@@ -23,4 +23,11 @@ public class Payment {
 
     @CreatedDate
     private LocalDateTime paymentDate;
+
+    // Stripe specific fields
+    private String stripeSessionId;
+    private String receiptUrl;
+    
+    @org.springframework.data.annotation.Transient
+    private String checkoutUrl;
 }
