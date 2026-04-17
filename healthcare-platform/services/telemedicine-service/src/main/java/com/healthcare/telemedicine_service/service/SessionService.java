@@ -1,5 +1,6 @@
 package com.healthcare.telemedicine_service.service;
 
+import com.healthcare.telemedicine_service.dto.SessionActivateResponse;
 import com.healthcare.telemedicine_service.dto.SessionRequest;
 import com.healthcare.telemedicine_service.model.VideoSession;
 import com.healthcare.telemedicine_service.repository.VideoSessionRepository;
@@ -21,7 +22,7 @@ public class SessionService {
     @Autowired
     private VideoSessionRepository sessionRepository;
 
-    @Value("${jitsi.base-url:https://meet.jitsi.iscom.ch}")
+    @Value("${jitsi.base-url:https://meet.jit.si}")
     private String jitsiBaseUrl;
 
     // Create a new video session for an appointment
@@ -89,6 +90,46 @@ public class SessionService {
             log.error("   Exception Type: {}", ex.getClass().getName());
             throw ex;
         }
+    }
+
+    // ── Activate session by appointment ID (called by doctor Start button) ────
+    public SessionActivateResponse activateSession(String appointmentId) {
+        log.info("🚀 [SessionService] activateSession() called for appointmentId: {}", appointmentId);
+
+        // 1. Find existing session or auto-create one
+        VideoSession session = sessionRepository.findByAppointmentId(appointmentId)
+                .orElseGet(() -> {
+                    log.info("   No session found — auto-creating for appointment: {}", appointmentId);
+                    String roomName  = "healthcare-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+                    String meetingUrl = jitsiBaseUrl + "/" + roomName;
+
+                    VideoSession newSession = new VideoSession();
+                    newSession.setAppointmentId(appointmentId);
+                    newSession.setRoomName(roomName);
+                    newSession.setMeetingUrl(meetingUrl);
+                    newSession.setStatus("CREATED");
+                    newSession.setCreatedAt(LocalDateTime.now());
+                    return newSession;
+                });
+
+        // 2. Activate the session (idempotent — re-activating an already-ACTIVE session is safe)
+        if ("COMPLETED".equals(session.getStatus())) {
+            log.warn("⚠️  [SessionService] Attempted to activate a COMPLETED session: {}", session.getId());
+            throw new RuntimeException("Cannot re-activate a completed session");
+        }
+
+        session.setStatus("ACTIVE");
+        session.setStartedAt(LocalDateTime.now());
+
+        VideoSession saved = sessionRepository.save(session);
+        log.info("✅ [SessionService] Session ACTIVE — id: {}, meetingUrl: {}", saved.getId(), saved.getMeetingUrl());
+
+        return new SessionActivateResponse(
+                saved.getId(),
+                saved.getAppointmentId(),
+                saved.getMeetingUrl(),
+                saved.getStatus()
+        );
     }
 
     // Get session by appointment ID
