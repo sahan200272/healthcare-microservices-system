@@ -59,7 +59,7 @@ public class PatientReportService {
      *  - The appointment must belong to this doctor (verified via Appointment Service).
      *
      * [INTEGRATION POINT] Appointment Service: GET /api/appointments/{appointmentId}
-     * [INTEGRATION POINT] Patient Service:     GET /api/patients/user/{userId}   (userId → _id resolution)
+     * [INTEGRATION POINT] Patient Service:     GET /api/patients/by-user/{userId}   (userId → _id resolution)
      * [INTEGRATION POINT] Patient Service:     GET /api/patients/{patientId}/reports
      *
      * @param doctorId      doctor making the request

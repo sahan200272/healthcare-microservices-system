@@ -34,7 +34,8 @@ public class PatientViewController {
             @RequestHeader("Authorization") String authHeader) {
 
         String token = authHeader.replace("Bearer ", "");
-        PatientDetailsResponse response = patientClientService.getPatientDetails(patientId, token);
+        // The API from the dashboard passes the patient's auth userId as 'patientId'
+        PatientDetailsResponse response = patientClientService.getPatientByUserId(patientId, token);
         return ResponseEntity.ok(response);
     }
 
@@ -56,8 +57,13 @@ public class PatientViewController {
             @RequestHeader("Authorization") String authHeader) {
 
         String token = authHeader.replace("Bearer ", "");
+        
+        // Resolve auth userId to MongoDB _id
+        PatientDetailsResponse patient = patientClientService.getPatientByUserId(patientId, token);
+        String realPatientId = patient.getPatientId();
+
         List<MedicalReportResponse> reports =
-                patientReportService.getPatientReports(doctorId, patientId, token);
+                patientReportService.getPatientReports(doctorId, realPatientId, token);
         return ResponseEntity.ok(reports);
     }
 }

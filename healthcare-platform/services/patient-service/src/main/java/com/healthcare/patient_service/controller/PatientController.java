@@ -32,7 +32,7 @@ public class PatientController {
     }
 
     // Get patient by userId (Auth Service userId) — any authenticated user
-    @GetMapping("/api/patients/user/{userId}")
+    @GetMapping("/api/patients/by-user/{userId}")
     public ResponseEntity<PatientResponse> getPatientByUserId(@PathVariable String userId) {
         return ResponseEntity.ok(patientService.getPatientByUserId(userId));
     }
