@@ -15,6 +15,9 @@ export default function Navbar() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+  // True when on any /doctor/* route — navbar must always be solid here
+  const isDoctorRoute = pathname.startsWith("/doctor");
+
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
@@ -80,7 +83,15 @@ export default function Navbar() {
   if (pathname === "/login" || pathname === "/register") return null;
 
   return (
-    <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled ? "glass py-2 shadow-lg" : "bg-transparent py-4"}`}>
+    <nav
+      className={`fixed top-0 w-full z-50 transition-all duration-300 ${
+        isDoctorRoute
+          ? "bg-white dark:bg-[#080f1e] border-b border-slate-200 dark:border-slate-800 py-2 shadow-sm"
+          : isScrolled
+          ? "bg-white/90 dark:bg-[#080f1e]/90 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800/60 py-2 shadow-lg"
+          : "bg-transparent py-4"
+      }`}
+    >
       <div className="container mx-auto px-6 flex justify-between items-center">
         <Link href="/dashboard" className="flex items-center space-x-2">
           <div className="bg-brand-primary p-2 rounded-xl">
