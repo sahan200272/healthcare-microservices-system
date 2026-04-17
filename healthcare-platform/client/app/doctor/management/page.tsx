@@ -1,523 +1,514 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Save,
-  Loader2,
+  User,
+  Mail,
+  Phone,
+  Stethoscope,
+  Award,
+  DollarSign,
+  FileText,
   Clock,
-  Plus,
-  X,
+  BadgeCheck,
   AlertCircle,
   CheckCircle2,
+  Save,
+  Edit3,
+  Loader2,
+  Calendar,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { doctorApi } from "@/lib/api";
+import AvailabilityCalendar from "@/app/components/doctor/AvailabilityCalendar";
+import Toast, { useToast } from "@/app/components/doctor/Toast";
+import type { DoctorProfile, DoctorUpdateRequest, AvailabilityResponse } from "@/lib/doctorTypes";
 
-interface DoctorProfile {
-  id: string;
-  name: string;
-  email: string;
-  specialization: string;
-  phone: string;
-  bio: string;
-  experience: number;
-  consultationFee: number;
-  clinic: string;
-  location: string;
-  verified: boolean;
-}
+type Tab = "profile" | "availability";
 
-interface Availability {
-  id: string;
-  dayOfWeek: string;
-  startTime: string;
-  endTime: string;
-}
+const SPECIALIZATIONS = [
+  "General Practitioner", "Cardiology", "Dermatology", "Endocrinology",
+  "Gastroenterology", "Neurology", "Oncology", "Orthopedics",
+  "Pediatrics", "Psychiatry", "Radiology", "Surgery", "Urology",
+];
+
+const VERIFICATION_CONFIG = {
+  APPROVED: { icon: BadgeCheck,   label: "Verified Doctor",       color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700" },
+  PENDING:  { icon: Clock,        label: "Pending Verification",  color: "text-amber-600 dark:text-amber-400",   bg: "bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700" },
+  REJECTED: { icon: AlertCircle,  label: "Registration Rejected", color: "text-red-600 dark:text-red-400",       bg: "bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700" },
+};
 
 export default function DoctorManagementPage() {
-  const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null);
-  const [availability, setAvailability] = useState<Availability[]>([]);
+  const [profile, setProfile] = useState<DoctorProfile | null>(null);
+  const [availability, setAvailability] = useState<AvailabilityResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("profile");
   const [editMode, setEditMode] = useState(false);
-  const [newSlot, setNewSlot] = useState({
-    dayOfWeek: "Monday",
-    startTime: "09:00",
-    endTime: "17:00",
-  });
-  const [successMessage, setSuccessMessage] = useState("");
+  const [activeTab, setActiveTab] = useState<Tab>("profile");
+  const [draft, setDraft] = useState<DoctorUpdateRequest>({});
+  const { toasts, addToast, dismiss } = useToast();
 
-  const doctorId = typeof window !== "undefined" ? localStorage.getItem("id") : "";
-  const userRole = typeof window !== "undefined" ? localStorage.getItem("role") : "";
+  const doctorId =
+    typeof window !== "undefined"
+      ? localStorage.getItem("doctorId") || localStorage.getItem("id") || ""
+      : "";
 
-  // Check if user is doctor
   useEffect(() => {
-    if (userRole !== "DOCTOR") {
-      if (typeof window !== "undefined") {
-        window.location.href = "/dashboard";
-      }
-    }
-
-    const loadData = async () => {
+    const load = async () => {
       if (!doctorId) return;
+      setLoading(true);
       try {
-        const [profileRes, availabilityRes] = await Promise.all([
+        const [profileRes, availRes] = await Promise.allSettled([
           doctorApi.getProfile(doctorId),
           doctorApi.getAvailability(doctorId),
         ]);
-
-        setDoctorProfile(profileRes.data);
-        setAvailability(availabilityRes.data || []);
-      } catch (error) {
-        console.error("Failed to load doctor data:", error);
+        if (profileRes.status === "fulfilled") {
+          setProfile(profileRes.value.data);
+        }
+        if (availRes.status === "fulfilled") {
+          setAvailability(availRes.value.data ?? []);
+        }
+      } catch {
+        addToast("Failed to load profile data.", "error");
       } finally {
         setLoading(false);
       }
     };
+    load();
+  }, [doctorId]);
 
-    loadData();
-  }, [doctorId, userRole]);
-
-  const handleProfileUpdate = async () => {
-    if (!doctorProfile) return;
-
-    setSaving(true);
-    try {
-      await doctorApi.updateProfile(doctorProfile.id, doctorProfile);
-      setSuccessMessage("Profile updated successfully!");
-      setEditMode(false);
-      setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error) {
-      console.error("Failed to update profile:", error);
-      alert("Failed to update profile");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleAddAvailability = async () => {
-    setSaving(true);
-    try {
-      await doctorApi.setAvailability(doctorId || "", newSlot);
-      setAvailability([...availability, { id: Date.now().toString(), ...newSlot }]);
-      setNewSlot({
-        dayOfWeek: "Monday",
-        startTime: "09:00",
-        endTime: "17:00",
+  const handleEditToggle = () => {
+    if (!editMode && profile) {
+      // Copy current values into draft
+      setDraft({
+        fullName:        profile.fullName,
+        phone:           profile.phone,
+        specialization:  profile.specialization,
+        qualification:   profile.qualification,
+        bio:             profile.bio,
+        consultationFee: profile.consultationFee,
+        experienceYears: profile.experienceYears,
       });
-      setSuccessMessage("Availability slot added!");
-      setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error) {
-      console.error("Failed to add availability:", error);
-      alert("Failed to add availability");
+    }
+    setEditMode((e) => !e);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await doctorApi.updateProfile(doctorId, draft);
+      setProfile(res.data);
+      setEditMode(false);
+      addToast("Profile updated successfully!", "success");
+    } catch {
+      addToast("Failed to update profile. Please try again.", "error");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleRemoveSlot = (id: string) => {
-    setAvailability(availability.filter((slot) => slot.id !== id));
-    setSuccessMessage("Slot removed!");
-    setTimeout(() => setSuccessMessage(""), 3000);
+  const handleAddAvailability = async (date: string, slots: string[]) => {
+    await doctorApi.setAvailability(doctorId, { availableDate: date, timeSlots: slots });
+    const res = await doctorApi.getAvailability(doctorId);
+    setAvailability(res.data ?? []);
+    addToast(`Availability saved for ${date}.`, "success");
+  };
+
+  const handleDeleteSlot = async (availabilityId: string) => {
+    try {
+      setAvailability((prev) => prev.filter((a) => a.availabilityId !== availabilityId));
+      addToast("Availability slot removed.", "info");
+    } catch {
+      addToast("Failed to remove slot.", "error");
+    }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen pt-24 px-6 bg-clinical-white dark:bg-clinical-dark flex items-center justify-center">
+      <div className="flex items-center justify-center h-full min-h-[60vh]">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-brand-primary mx-auto mb-4" />
-          <p className="text-clinical-gray">Loading doctor profile...</p>
+          <Loader2 className="w-10 h-10 animate-spin text-brand-primary mx-auto mb-3" />
+          <p className="text-clinical-gray">Loading profile...</p>
         </div>
       </div>
     );
   }
 
-  if (!doctorProfile) {
-    return (
-      <div className="min-h-screen pt-24 px-6 bg-clinical-white dark:bg-clinical-dark flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-clinical-dark dark:text-clinical-white">Failed to load doctor profile</p>
-        </div>
-      </div>
-    );
-  }
+  const verStatus = profile?.verificationStatus ?? "PENDING";
+  const verCfg = VERIFICATION_CONFIG[verStatus] ?? VERIFICATION_CONFIG.PENDING;
+  const VerIcon = verCfg.icon;
 
   return (
-    <div className="min-h-screen pt-24 pb-12 px-6 bg-clinical-white dark:bg-clinical-dark">
-      <div className="container mx-auto max-w-4xl">
+    <>
+      <Toast toasts={toasts} onDismiss={dismiss} />
+      <div className="px-8 py-8 space-y-6">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-clinical-dark dark:text-clinical-white mb-2">Doctor Management</h1>
-          <p className="text-clinical-gray">Manage your profile and availability</p>
+        <div>
+          <h1 className="text-3xl font-bold text-clinical-dark dark:text-clinical-white tracking-tight">
+            My Profile
+          </h1>
+          <p className="text-clinical-gray text-sm mt-1">
+            Manage your professional profile and schedule
+          </p>
         </div>
 
-        {/* Success Message */}
-        {successMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="mb-6 bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-800 rounded-2xl p-4 flex items-center gap-3"
-          >
-            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-            <p className="text-green-700 dark:text-green-300">{successMessage}</p>
-          </motion.div>
-        )}
-
-        {/* Verification Status */}
-        <div
-          className={`glass rounded-3xl p-6 mb-8 border-2 ${
-            doctorProfile.verified
-              ? "border-green-400 dark:border-green-600"
-              : "border-yellow-400 dark:border-yellow-600"
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            {doctorProfile.verified ? (
-              <CheckCircle2 className="w-6 h-6 text-green-500" />
-            ) : (
-              <AlertCircle className="w-6 h-6 text-yellow-500" />
-            )}
-            <div>
-              <p className="font-bold text-clinical-dark dark:text-clinical-white">
-                {doctorProfile.verified ? "Verified Doctor" : "Pending Verification"}
-              </p>
-              <p className="text-sm text-clinical-gray">
-                {doctorProfile.verified
-                  ? "Your credentials have been approved"
-                  : "Your profile is pending admin verification"}
-              </p>
-            </div>
+        {/* Verification Banner */}
+        <div className={`flex items-center gap-3 px-5 py-4 rounded-2xl border ${verCfg.bg}`}>
+          <VerIcon className={`w-5 h-5 ${verCfg.color} shrink-0`} />
+          <div>
+            <p className={`font-bold text-sm ${verCfg.color}`}>{verCfg.label}</p>
+            <p className="text-xs text-clinical-gray mt-0.5">
+              {verStatus === "APPROVED"
+                ? "Your credentials have been verified and approved by admin."
+                : verStatus === "PENDING"
+                ? "Your registration is under review. You'll be notified once approved."
+                : "Your registration was rejected. Please contact support."}
+            </p>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-8">
-          {[
-            { id: "profile", label: "Profile" },
-            { id: "availability", label: "Availability" },
-          ].map((tab) => (
+        <div className="flex gap-2">
+          {(["profile", "availability"] as Tab[]).map((tab) => (
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-6 py-3 rounded-2xl font-bold transition-all ${
-                activeTab === tab.id
-                  ? "bg-brand-primary text-white"
-                  : "bg-white dark:bg-slate-900 text-clinical-dark dark:text-clinical-white"
+              key={tab}
+              id={`tab-${tab}`}
+              onClick={() => setActiveTab(tab)}
+              className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all capitalize ${
+                activeTab === tab
+                  ? "bg-brand-primary text-white shadow-md shadow-brand-primary/30"
+                  : "bg-white dark:bg-slate-800 text-clinical-gray hover:text-brand-primary border border-slate-200 dark:border-slate-700"
               }`}
             >
-              {tab.label}
+              {tab === "availability" ? "Availability" : "Profile"}
             </button>
           ))}
         </div>
 
-        {/* Profile Tab */}
+        {/* === PROFILE TAB === */}
         {activeTab === "profile" && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-            <div className="glass rounded-3xl p-8">
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-bold text-clinical-dark dark:text-clinical-white">Profile Information</h2>
-                <button
-                  onClick={() => setEditMode(!editMode)}
-                  className="px-6 py-2 bg-brand-primary hover:bg-brand-primary/90 text-white rounded-lg font-bold transition-all"
-                >
-                  {editMode ? "Cancel" : "Edit"}
-                </button>
-              </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="profile"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <div className="glass rounded-3xl p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-xl font-bold text-clinical-dark dark:text-clinical-white">
+                    Professional Information
+                  </h2>
+                  <button
+                    id="edit-profile-btn"
+                    onClick={handleEditToggle}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                      editMode
+                        ? "bg-slate-100 dark:bg-slate-800 text-clinical-gray"
+                        : "bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20"
+                    }`}
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    {editMode ? "Cancel" : "Edit Profile"}
+                  </button>
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Name */}
-                <div>
-                  <label className="block text-sm font-bold text-clinical-gray mb-2">Full Name</label>
-                  {editMode ? (
-                    <input
-                      type="text"
-                      value={doctorProfile.name}
-                      onChange={(e) =>
-                        setDoctorProfile({ ...doctorProfile, name: e.target.value })
-                      }
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
+                {profile ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <ProfileField
+                      label="Full Name" icon={User}
+                      value={profile.fullName}
+                      editValue={draft.fullName}
+                      editing={editMode}
+                      onChange={(v) => setDraft({ ...draft, fullName: v })}
                     />
-                  ) : (
-                    <p className="text-clinical-dark dark:text-clinical-white font-bold text-lg">
-                      Dr. {doctorProfile.name}
+                    <ProfileField
+                      label="Email" icon={Mail}
+                      value={profile.email}
+                      editing={false}   // email is read-only
+                    />
+                    <ProfileField
+                      label="Phone" icon={Phone}
+                      value={profile.phone}
+                      editValue={draft.phone}
+                      editing={editMode}
+                      onChange={(v) => setDraft({ ...draft, phone: v })}
+                    />
+                    <ProfileFieldSelect
+                      label="Specialization" icon={Stethoscope}
+                      value={profile.specialization}
+                      editValue={draft.specialization}
+                      options={SPECIALIZATIONS}
+                      editing={editMode}
+                      onChange={(v) => setDraft({ ...draft, specialization: v })}
+                    />
+                    <ProfileField
+                      label="Qualification" icon={Award}
+                      value={profile.qualification}
+                      editValue={draft.qualification}
+                      editing={editMode}
+                      onChange={(v) => setDraft({ ...draft, qualification: v })}
+                    />
+                    <ProfileField
+                      label="License Number" icon={BadgeCheck}
+                      value={profile.licenseNumber}
+                      editing={false}   // immutable
+                    />
+                    <ProfileFieldNumber
+                      label="Experience (Years)" icon={Clock}
+                      value={profile.experienceYears}
+                      editValue={draft.experienceYears}
+                      editing={editMode}
+                      onChange={(v) => setDraft({ ...draft, experienceYears: v })}
+                    />
+                    <ProfileFieldNumber
+                      label="Consultation Fee (Rs.)" icon={DollarSign}
+                      value={profile.consultationFee}
+                      editValue={draft.consultationFee}
+                      editing={editMode}
+                      onChange={(v) => setDraft({ ...draft, consultationFee: v })}
+                    />
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-clinical-gray uppercase tracking-wider mb-2">
+                        <FileText className="w-3.5 h-3.5 inline mr-1" />Bio
+                      </label>
+                      {editMode ? (
+                        <textarea
+                          value={draft.bio ?? ""}
+                          onChange={(e) => setDraft({ ...draft, bio: e.target.value })}
+                          rows={4}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-clinical-dark dark:text-clinical-white outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary transition-all resize-none"
+                        />
+                      ) : (
+                        <p className="text-sm text-clinical-dark dark:text-clinical-white leading-relaxed">
+                          {profile.bio || <span className="text-clinical-gray italic">No bio provided.</span>}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <AlertCircle className="w-10 h-10 text-amber-400 mx-auto mb-3" />
+                    <p className="text-clinical-gray">
+                      Doctor profile not found. Please register your profile first.
                     </p>
-                  )}
-                </div>
+                  </div>
+                )}
 
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-bold text-clinical-gray mb-2">Email</label>
-                  {editMode ? (
-                    <input
-                      type="email"
-                      value={doctorProfile.email}
-                      onChange={(e) =>
-                        setDoctorProfile({ ...doctorProfile, email: e.target.value })
-                      }
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
-                    />
-                  ) : (
-                    <p className="text-clinical-dark dark:text-clinical-white">{doctorProfile.email}</p>
-                  )}
-                </div>
-
-                {/* Phone */}
-                <div>
-                  <label className="block text-sm font-bold text-clinical-gray mb-2">Phone</label>
-                  {editMode ? (
-                    <input
-                      type="tel"
-                      value={doctorProfile.phone}
-                      onChange={(e) =>
-                        setDoctorProfile({ ...doctorProfile, phone: e.target.value })
-                      }
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
-                    />
-                  ) : (
-                    <p className="text-clinical-dark dark:text-clinical-white">{doctorProfile.phone}</p>
-                  )}
-                </div>
-
-                {/* Specialization */}
-                <div>
-                  <label className="block text-sm font-bold text-clinical-gray mb-2">Specialization</label>
-                  {editMode ? (
-                    <input
-                      type="text"
-                      value={doctorProfile.specialization}
-                      onChange={(e) =>
-                        setDoctorProfile({ ...doctorProfile, specialization: e.target.value })
-                      }
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
-                    />
-                  ) : (
-                    <p className="text-clinical-dark dark:text-clinical-white">{doctorProfile.specialization}</p>
-                  )}
-                </div>
-
-                {/* Experience */}
-                <div>
-                  <label className="block text-sm font-bold text-clinical-gray mb-2">Experience (Years)</label>
-                  {editMode ? (
-                    <input
-                      type="number"
-                      value={doctorProfile.experience}
-                      onChange={(e) =>
-                        setDoctorProfile({
-                          ...doctorProfile,
-                          experience: parseInt(e.target.value),
-                        })
-                      }
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
-                    />
-                  ) : (
-                    <p className="text-clinical-dark dark:text-clinical-white">{doctorProfile.experience} years</p>
-                  )}
-                </div>
-
-                {/* Consultation Fee */}
-                <div>
-                  <label className="block text-sm font-bold text-clinical-gray mb-2">Consultation Fee (Rs.)</label>
-                  {editMode ? (
-                    <input
-                      type="number"
-                      value={doctorProfile.consultationFee}
-                      onChange={(e) =>
-                        setDoctorProfile({
-                          ...doctorProfile,
-                          consultationFee: parseInt(e.target.value),
-                        })
-                      }
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
-                    />
-                  ) : (
-                    <p className="text-clinical-dark dark:text-clinical-white">Rs. {doctorProfile.consultationFee}</p>
-                  )}
-                </div>
-
-                {/* Clinic */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-clinical-gray mb-2">Clinic Name</label>
-                  {editMode ? (
-                    <input
-                      type="text"
-                      value={doctorProfile.clinic}
-                      onChange={(e) =>
-                        setDoctorProfile({ ...doctorProfile, clinic: e.target.value })
-                      }
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
-                    />
-                  ) : (
-                    <p className="text-clinical-dark dark:text-clinical-white">{doctorProfile.clinic}</p>
-                  )}
-                </div>
-
-                {/* Location */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-clinical-gray mb-2">Location</label>
-                  {editMode ? (
-                    <input
-                      type="text"
-                      value={doctorProfile.location}
-                      onChange={(e) =>
-                        setDoctorProfile({ ...doctorProfile, location: e.target.value })
-                      }
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
-                    />
-                  ) : (
-                    <p className="text-clinical-dark dark:text-clinical-white">{doctorProfile.location}</p>
-                  )}
-                </div>
-
-                {/* Bio */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-clinical-gray mb-2">Bio</label>
-                  {editMode ? (
-                    <textarea
-                      value={doctorProfile.bio}
-                      onChange={(e) =>
-                        setDoctorProfile({ ...doctorProfile, bio: e.target.value })
-                      }
-                      rows={4}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
-                    />
-                  ) : (
-                    <p className="text-clinical-dark dark:text-clinical-white">{doctorProfile.bio}</p>
-                  )}
-                </div>
+                {editMode && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-8 flex justify-end"
+                  >
+                    <button
+                      id="save-profile-btn"
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="flex items-center gap-2 px-7 py-3 bg-brand-primary hover:bg-brand-primary/90 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-60 shadow-lg shadow-brand-primary/30"
+                    >
+                      {saving ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                      ) : (
+                        <><Save className="w-4 h-4" /> Save Changes</>
+                      )}
+                    </button>
+                  </motion.div>
+                )}
               </div>
-
-              {editMode && (
-                <button
-                  onClick={handleProfileUpdate}
-                  disabled={saving}
-                  className="mt-8 w-full bg-brand-primary hover:bg-brand-primary/90 text-white px-8 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {saving ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4" />
-                  )}
-                  {saving ? "Saving..." : "Save Changes"}
-                </button>
-              )}
-            </div>
-          </motion.div>
+            </motion.div>
+          </AnimatePresence>
         )}
 
-        {/* Availability Tab */}
+        {/* === AVAILABILITY TAB === */}
         {activeTab === "availability" && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-            <div className="glass rounded-3xl p-8">
-              <h2 className="text-2xl font-bold text-clinical-dark dark:text-clinical-white mb-8">Set Availability</h2>
-
-              {/* Add New Slot */}
-              <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-6 mb-8">
-                <h3 className="text-lg font-bold text-clinical-dark dark:text-clinical-white mb-6">Add New Slot</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div>
-                    <label className="block text-sm font-bold text-clinical-gray mb-2">Day of Week</label>
-                    <select
-                      value={newSlot.dayOfWeek}
-                      onChange={(e) =>
-                        setNewSlot({ ...newSlot, dayOfWeek: e.target.value })
-                      }
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
-                    >
-                      {[
-                        "Monday",
-                        "Tuesday",
-                        "Wednesday",
-                        "Thursday",
-                        "Friday",
-                        "Saturday",
-                        "Sunday",
-                      ].map((day) => (
-                        <option key={day} value={day}>
-                          {day}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-clinical-gray mb-2">Start Time</label>
-                    <input
-                      type="time"
-                      value={newSlot.startTime}
-                      onChange={(e) =>
-                        setNewSlot({ ...newSlot, startTime: e.target.value })
-                      }
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-clinical-gray mb-2">End Time</label>
-                    <input
-                      type="time"
-                      value={newSlot.endTime}
-                      onChange={(e) =>
-                        setNewSlot({ ...newSlot, endTime: e.target.value })
-                      }
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/20"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleAddAvailability}
-                  disabled={saving}
-                  className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white px-8 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {saving ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Plus className="w-4 h-4" />
-                  )}
-                  {saving ? "Adding..." : "Add Slot"}
-                </button>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="availability"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="space-y-6"
+            >
+              {/* Add new availability */}
+              <div className="glass rounded-3xl p-8">
+                <h2 className="text-xl font-bold text-clinical-dark dark:text-clinical-white mb-6 flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-brand-primary" />
+                  Add Availability
+                </h2>
+                <AvailabilityCalendar
+                  doctorId={doctorId}
+                  existingSlots={availability.map((a) => ({
+                    availableDate: a.availableDate,
+                    timeSlots: a.timeSlots,
+                  }))}
+                  onAdd={handleAddAvailability}
+                />
               </div>
 
-              {/* Current Slots */}
-              <h3 className="text-lg font-bold text-clinical-dark dark:text-clinical-white mb-6">Your Availability Slots</h3>
-              {availability.length === 0 ? (
-                <div className="text-center py-12">
-                  <Clock className="w-12 h-12 text-clinical-gray/50 mx-auto mb-4" />
-                  <p className="text-clinical-gray">No availability slots set yet</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {availability.map((slot) => (
-                    <div
-                      key={slot.id}
-                      className="flex items-center justify-between bg-white dark:bg-slate-900 rounded-xl p-4"
-                    >
-                      <div className="flex-1">
-                        <p className="font-bold text-clinical-dark dark:text-clinical-white">
-                          {slot.dayOfWeek}
-                        </p>
-                        <p className="text-sm text-clinical-gray">
-                          {slot.startTime} - {slot.endTime}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleRemoveSlot(slot.id)}
-                        className="p-2 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-lg text-red-500 transition-all"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
+              {/* Existing slots */}
+              <div className="glass rounded-3xl p-8">
+                <h2 className="text-xl font-bold text-clinical-dark dark:text-clinical-white mb-6 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-brand-primary" />
+                  Scheduled Availability
+                  <span className="text-sm font-normal text-clinical-gray">({availability.length} dates)</span>
+                </h2>
+                {availability.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Calendar className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+                    <p className="text-clinical-gray">No availability set yet.</p>
+                    <p className="text-xs text-clinical-gray mt-1">
+                      Use the form above to add your available dates.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {availability
+                      .sort((a, b) => a.availableDate.localeCompare(b.availableDate))
+                      .map((slot, idx) => (
+                        <motion.div
+                          key={slot.availabilityId}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.05 }}
+                          className="flex items-start justify-between bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-100 dark:border-slate-700 group hover:border-brand-primary/30 transition-all"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <Calendar className="w-4 h-4 text-brand-primary" />
+                              <p className="font-bold text-clinical-dark dark:text-clinical-white">
+                                {new Date(slot.availableDate + "T00:00:00").toLocaleDateString("en-US", {
+                                  weekday: "long", year: "numeric", month: "long", day: "numeric",
+                                })}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {slot.timeSlots.map((t) => (
+                                <span
+                                  key={t}
+                                  className="text-xs font-bold px-2.5 py-1 rounded-lg bg-brand-primary/10 text-brand-primary"
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteSlot(slot.availabilityId)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-xl text-red-500"
+                            title="Remove this availability"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </motion.div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </AnimatePresence>
         )}
       </div>
+    </>
+  );
+}
+
+// ─── Helper sub-components ───────────────────────────────────────────────────
+
+function ProfileField({
+  label, icon: Icon, value, editValue, editing, onChange,
+}: {
+  label: string;
+  icon: React.ElementType;
+  value: string | number | null | undefined;
+  editValue?: string;
+  editing: boolean;
+  onChange?: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-bold text-clinical-gray uppercase tracking-wider mb-2">
+        <Icon className="w-3.5 h-3.5 inline mr-1.5" />{label}
+      </label>
+      {editing && onChange ? (
+        <input
+          type="text"
+          value={editValue ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-clinical-dark dark:text-clinical-white outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary transition-all"
+        />
+      ) : (
+        <p className="text-sm font-semibold text-clinical-dark dark:text-clinical-white">
+          {value ?? <span className="text-clinical-gray italic">Not set</span>}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ProfileFieldSelect({
+  label, icon: Icon, value, editValue, options, editing, onChange,
+}: {
+  label: string;
+  icon: React.ElementType;
+  value: string | null | undefined;
+  editValue?: string;
+  options: string[];
+  editing: boolean;
+  onChange?: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-bold text-clinical-gray uppercase tracking-wider mb-2">
+        <Icon className="w-3.5 h-3.5 inline mr-1.5" />{label}
+      </label>
+      {editing && onChange ? (
+        <select
+          value={editValue ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-clinical-dark dark:text-clinical-white outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary transition-all"
+        >
+          <option value="">Select specialization</option>
+          {options.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      ) : (
+        <p className="text-sm font-semibold text-clinical-dark dark:text-clinical-white">
+          {value ?? <span className="text-clinical-gray italic">Not set</span>}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ProfileFieldNumber({
+  label, icon: Icon, value, editValue, editing, onChange,
+}: {
+  label: string;
+  icon: React.ElementType;
+  value: number | null | undefined;
+  editValue?: number;
+  editing: boolean;
+  onChange?: (v: number) => void;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-bold text-clinical-gray uppercase tracking-wider mb-2">
+        <Icon className="w-3.5 h-3.5 inline mr-1.5" />{label}
+      </label>
+      {editing && onChange ? (
+        <input
+          type="number"
+          value={editValue ?? ""}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-clinical-dark dark:text-clinical-white outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary transition-all"
+        />
+      ) : (
+        <p className="text-sm font-semibold text-clinical-dark dark:text-clinical-white">
+          {value != null ? value : <span className="text-clinical-gray italic">Not set</span>}
+        </p>
+      )}
     </div>
   );
 }

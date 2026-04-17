@@ -76,7 +76,7 @@ export const patientApi = {
   getProfile: (patientId: string) => 
     api.get(`/api/patients/${patientId}`),
   getProfileByUserId: (userId: string) => 
-    api.get(`/api/patients/user/${userId}`),
+    api.get(`/api/patients/by-user/${userId}`),
   updateProfile: (patientId: string, profileData: any) => 
     api.put(`/api/patients/${patientId}`, profileData),
   uploadReport: (patientId: string, formData: FormData) => 
@@ -101,18 +101,49 @@ export const patientApi = {
 
 // Doctor API
 export const doctorApi = {
-  getProfile: (doctorId: string) => 
+  // Profile
+  registerProfile: (profileData: any) =>
+    api.post(`/api/doctors/register`, profileData),
+  getProfile: (doctorId: string) =>
     api.get(`/api/doctors/${doctorId}`),
-  updateProfile: (doctorId: string, profileData: any) => 
-    api.put(`/api/doctors/${doctorId}`, profileData),
-  setAvailability: (doctorId: string, availabilityData: any) => 
+  getProfileByUserId: (userId: string) =>
+    api.get(`/api/doctors/user/${userId}`),
+  updateProfile: (doctorId: string, profileData: any) =>
+    api.patch(`/api/doctors/${doctorId}`, profileData),
+  getAllDoctors: () =>
+    api.get(`/api/doctors`),
+
+  // Availability
+  setAvailability: (doctorId: string, availabilityData: any) =>
     api.post(`/api/doctors/${doctorId}/availability`, availabilityData),
-  getAvailability: (doctorId: string) => 
+  getAvailability: (doctorId: string) =>
     api.get(`/api/doctors/${doctorId}/availability`),
-  viewPatientReports: (patientId: string) => 
-    api.get(`/api/doctors/patients/${patientId}/reports`),
-  issuePrescription: (appointmentId: string, prescriptionData: any) => 
-    api.post(`/api/doctors/prescriptions/issue`, { appointmentId, ...prescriptionData }),
+
+  // Appointment actions (Doctor Service endpoints)
+  acceptAppointment: (doctorId: string, appointmentId: string) =>
+    api.put(`/api/doctors/${doctorId}/appointments/${appointmentId}/accept`, {}),
+  rejectAppointment: (doctorId: string, appointmentId: string) =>
+    api.put(`/api/doctors/${doctorId}/appointments/${appointmentId}/reject`, {}),
+  getReportsByAppointment: (doctorId: string, appointmentId: string) =>
+    api.get(`/api/doctors/${doctorId}/appointments/${appointmentId}/reports`),
+
+  // Patient view
+  getPatientDetails: (doctorId: string, patientId: string) =>
+    api.get(`/api/doctors/${doctorId}/patients/${patientId}`),
+  getPatientReports: (doctorId: string, patientId: string) =>
+    api.get(`/api/doctors/${doctorId}/patients/${patientId}/reports`),
+
+  // Prescriptions
+  issuePrescription: (doctorId: string, prescriptionData: any) =>
+    api.post(`/api/doctors/${doctorId}/prescriptions`, prescriptionData),
+  getDoctorPrescriptions: (doctorId: string) =>
+    api.get(`/api/doctors/${doctorId}/prescriptions`),
+
+  // Appointment list (Appointment Service)
+  getAppointments: (doctorId: string) =>
+    api.get(`/api/appointments/doctor/${doctorId}`),
+  completeAppointment: (appointmentId: string) =>
+    api.put(`/api/appointments/${appointmentId}/complete`, {}),
 };
 
 // Payment API
