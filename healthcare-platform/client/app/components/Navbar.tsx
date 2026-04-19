@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, User, LogOut, LayoutDashboard, Stethoscope, FileText, Settings, ShieldAlert, Brain, Calendar } from "lucide-react";
+import { Activity, User, LogOut, LayoutDashboard, Stethoscope, FileText, Settings, ShieldAlert, Brain, Calendar, Bell } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -54,6 +54,7 @@ export default function Navbar() {
         { href: "/book-appointment", label: "Book Appointment", icon: Calendar },
         { href: "/browse-doctors", label: "Find Doctors", icon: Stethoscope },
         { href: "/symptom-checker", label: "Symptom Checker", icon: Brain },
+        { href: "/notifications", label: "Notifications", icon: Bell },
         { href: "/patient-profile", label: "My Profile", icon: User },
       ];
     }
@@ -63,6 +64,7 @@ export default function Navbar() {
         ...baseLinks,
         { href: "/doctor/appointments", label: "Appointments", icon: Calendar },
         { href: "/doctor/prescriptions", label: "Prescriptions", icon: FileText },
+        { href: "/notifications", label: "Notifications", icon: Bell },
         { href: "/doctor/management", label: "My Profile", icon: Settings },
       ];
     }
