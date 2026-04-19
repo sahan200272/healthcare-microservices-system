@@ -27,7 +27,12 @@ export default function LoginPage() {
       localStorage.setItem("id", response.data.id);
       localStorage.setItem("email", email);
 
-      router.push("/dashboard");
+      const role = response.data.role;
+      if (role === "DOCTOR") {
+        router.push("/doctor/dashboard");
+      } else {
+        router.push("/dashboard");
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || "Invalid credentials. Please try again.");
     } finally {
