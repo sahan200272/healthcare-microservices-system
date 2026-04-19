@@ -49,12 +49,13 @@ public class AuthService {
         }
 
         String normalizedRole = normalizeRole(user.getRole());
-        String token = jwtUtil.generateToken(user.getEmail(), normalizedRole);
+        String token = jwtUtil.generateToken(user.getEmail(), normalizedRole, user.getId());
 
         return Map.of(
                 "token", token,
                 "role", normalizedRole,
-                "name", user.getName()
+                "name", user.getName(),
+                "id", user.getId()
         );
     }
 

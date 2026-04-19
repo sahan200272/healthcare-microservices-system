@@ -21,6 +21,8 @@ public interface DoctorRepository extends MongoRepository<Doctor, String> {
 
     List<Doctor> findByVerificationStatus(VerificationStatus status);
 
+    boolean existsByUserId(String userId);
+
     boolean existsByEmail(String email);
 
     boolean existsByLicenseNumber(String licenseNumber);

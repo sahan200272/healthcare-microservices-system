@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
 
   api-gateway:
@@ -10,9 +8,16 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - AUTH_SERVICE_URL=http://auth-service:8088
       - TELEMEDICINE_SERVICE_URL=http://telemedicine-service:8087
-    depends_on: # Ensures these services start before gateway
+      - APPOINTMENT_SERVICE_URL=http://appointment-service:8082
+      - DOCTOR_SERVICE_URL=http://doctor-service:8083
+      - PATIENT_SERVICE_URL=http://patient-service:8085
+    depends_on:
       - auth-service
       - telemedicine-service
+      - appointment-service
+      - doctor-service
+      - patient-service
+      - notification-service
 
   auth-service:
     build: ./healthcare-platform/services/auth-service
@@ -31,3 +36,73 @@ services:
       - MONGO_URI=${MONGO_URI_TELEMEDICINE}
       - PORT=8087
       - JWT_SECRET=${JWT_SECRET}
+
+  doctor-service:
+    build: ./healthcare-platform/services/doctor-service
+    ports:
+      - "8083:8083"
+    environment:
+      - MONGO_URI=${MONGO_URI_DOCTOR}
+      - PORT=8083
+      - JWT_SECRET=${JWT_SECRET}
+      - APPOINTMENT_SERVICE_URL=http://appointment-service:8082
+      - PATIENT_SERVICE_URL=http://patient-service:8085
+    depends_on:
+      - auth-service
+
+  appointment-service:
+    build: ./healthcare-platform/services/appointment-service
+    ports:
+      - "8082:8082"
+    environment:
+      - MONGO_URI=${MONGO_URI_APPOINTMENT}
+      - PORT=8082
+      - JWT_SECRET=${JWT_SECRET}
+      - DOCTOR_SERVICE_URL=http://doctor-service:8083
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8084
+    depends_on:
+      - doctor-service
+      - notification-service
+
+  notification-service:
+    build: ./healthcare-platform/services/notification-service
+    ports:
+      - "8084:8084"
+    environment:
+      - MONGO_URI=${MONGO_URI_NOTIFICATION}
+      - PORT=8084
+
+  patient-service:
+    build: ./healthcare-platform/services/patient-service
+    ports:
+      - "8085:8085"
+    environment:
+      - MONGO_URI=${MONGO_URI_PATIENT}
+      - PORT=8085
+      - JWT_SECRET=${JWT_SECRET}
+
+  payment-service:
+    build: ./healthcare-platform/services/payment-service
+    ports:
+      - "8086:8086"
+    environment:
+      - MONGO_URI=${MONGO_URI_PAYMENT}
+      - PORT=8086
+      - JWT_SECRET=${JWT_SECRET}
+
+  ai-symptom-service:
+    build: ./healthcare-platform/services/ai-symptom-service
+    ports:
+      - "8089:8089"
+    environment:
+      - PORT=8089
+
+  client:
+    build: ./healthcare-platform/client
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api-gateway:8080
+    depends_on:
+      - api-gateway
+    container_name: healthcare-client

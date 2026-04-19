@@ -36,6 +36,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (jwtUtil.isTokenValid(token)) {
                 String email = jwtUtil.extractEmail(token);
                 String role = normalizeRole(jwtUtil.extractRole(token));
+                String userId = jwtUtil.extractUserId(token);
 
                 if (role == null || role.isBlank()) {
                     log.warn("JWT role claim missing/blank for request {}", request.getRequestURI());
@@ -49,9 +50,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                 null,
                                 List.of(new SimpleGrantedAuthority(role))
                         );
+                authentication.setDetails(userId);
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-                log.debug("Authenticated request {} as {} with authority {}", request.getRequestURI(), email, role);
+                log.debug("Authenticated request {} as {} (userId={}) with authority {}", request.getRequestURI(), email, userId, role);
             } else {
                 log.warn("Rejected invalid JWT for request {}", request.getRequestURI());
             }

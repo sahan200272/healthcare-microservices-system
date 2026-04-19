@@ -21,6 +21,12 @@ public class DoctorService {
     private final DoctorRepository doctorRepository;
 
     public DoctorResponse registerDoctor(DoctorRequest request, String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new BadRequestException("Unable to resolve authenticated user ID from token.");
+        }
+        if (doctorRepository.existsByUserId(userId)) {
+            throw new BadRequestException("A doctor profile already exists for this account.");
+        }
         if (doctorRepository.existsByEmail(request.getEmail())) {
             throw new BadRequestException("A doctor with this email already exists.");
         }
@@ -45,6 +51,12 @@ public class DoctorService {
 
     public DoctorResponse getDoctorById(String doctorId) {
         Doctor doctor = findDoctorOrThrow(doctorId);
+        return toResponse(doctor);
+    }
+
+    public DoctorResponse getDoctorByUserId(String userId) {
+        Doctor doctor = doctorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor profile not found for userId: " + userId));
         return toResponse(doctor);
     }
 

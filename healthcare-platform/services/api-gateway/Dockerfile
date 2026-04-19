@@ -1,5 +1,5 @@
 # api-gateway Dockerfile
-FROM eclipse-temurin:21-jdk-alpine
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY target/*.jar app.jar
 EXPOSE 8080

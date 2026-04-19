@@ -18,7 +18,7 @@ public class ReportService {
     private final ReportRepository reportRepository;
     private final PatientRepository patientRepository;
 
-    public MedicalReport uploadReport(String patientId, ReportRequest request, String currentUserId) {
+    public MedicalReport uploadReport(String patientId, String reportType, String description, org.springframework.web.multipart.MultipartFile file, String currentUserId) throws java.io.IOException {
         Patient patient = patientRepository.findById(patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found with ID: " + patientId));
 
@@ -29,10 +29,52 @@ public class ReportService {
 
         MedicalReport report = new MedicalReport();
         report.setPatientId(patientId);
-        report.setReportType(request.getReportType());
-        report.setDescription(request.getDescription());
-        report.setFileUrl(request.getFileUrl());
+        report.setReportType(reportType);
+        report.setDescription(description);
         
+        if (file != null && !file.isEmpty()) {
+            String uploadDir = "uploads/";
+            java.nio.file.Path uploadPath = java.nio.file.Paths.get(uploadDir);
+            if (!java.nio.file.Files.exists(uploadPath)) {
+                java.nio.file.Files.createDirectories(uploadPath);
+            }
+            String fileName = java.util.UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+            java.nio.file.Path filePath = uploadPath.resolve(fileName);
+            java.nio.file.Files.copy(file.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            report.setFileUrl(filePath.toString());
+        }
+        
+        return reportRepository.save(report);
+    }
+
+    public MedicalReport updateReport(String reportId, String reportType, String description, org.springframework.web.multipart.MultipartFile file, String currentUserId) throws java.io.IOException {
+        MedicalReport report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Report not found with ID: " + reportId));
+
+        Patient patient = patientRepository.findById(report.getPatientId())
+                .orElseThrow(() -> new ResourceNotFoundException("Associated patient not found"));
+
+        // Check ownership
+        if (!patient.getUserId().equals(currentUserId)) {
+            throw new org.springframework.security.access.AccessDeniedException("You cannot update a report for someone else's profile");
+        }
+
+        report.setReportType(reportType);
+        report.setDescription(description);
+
+        if (file != null && !file.isEmpty()) {
+            String uploadDir = "uploads/";
+            java.nio.file.Path uploadPath = java.nio.file.Paths.get(uploadDir);
+            if (!java.nio.file.Files.exists(uploadPath)) {
+                java.nio.file.Files.createDirectories(uploadPath);
+            }
+            // Optional: delete old file here if required
+            String fileName = java.util.UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+            java.nio.file.Path filePath = uploadPath.resolve(fileName);
+            java.nio.file.Files.copy(file.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            report.setFileUrl(filePath.toString());
+        }
+
         return reportRepository.save(report);
     }
 

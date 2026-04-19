@@ -29,14 +29,19 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+//                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         // Public: browse all doctors and availability without auth
                         // NOTE: requestMatchers uses Ant patterns — use * not {id} for wildcards
-                        .requestMatchers(HttpMethod.POST, "/api/doctors/register").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/doctors").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/doctors/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/doctors/*/availability").permitAll()
+                        // Authenticated patients can read their own prescriptions from Doctor Service
+                        .requestMatchers(HttpMethod.GET, "/api/doctors/prescriptions/patient/*").authenticated()
+                        // Service-to-service calls from Appointment Service (no user JWT)
+                        .requestMatchers(HttpMethod.GET, "/api/doctors/*/availability/check").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/doctors/*/availability/book").permitAll()
                         // All other endpoints require authentication;
                         // fine-grained role checks are done via @PreAuthorize in controllers
                         .anyRequest().authenticated()
@@ -54,18 +59,5 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
-    }
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
     }
 }

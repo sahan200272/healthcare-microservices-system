@@ -1,9 +1,11 @@
 package com.healthcare.telemedicine_service.service;
 
+import com.healthcare.telemedicine_service.dto.SessionActivateResponse;
 import com.healthcare.telemedicine_service.dto.SessionRequest;
 import com.healthcare.telemedicine_service.model.VideoSession;
 import com.healthcare.telemedicine_service.repository.VideoSessionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SessionService {
@@ -19,63 +22,169 @@ public class SessionService {
     @Autowired
     private VideoSessionRepository sessionRepository;
 
-    @Value("${jitsi.base-url}")
+    @Value("${jitsi.base-url:https://meet.jit.si}")
     private String jitsiBaseUrl;
 
     // Create a new video session for an appointment
     public VideoSession createSession(SessionRequest request) {
+        try {
+            log.info("📹 [SessionService] Starting to create video session for appointment: {}", request.getAppointmentId());
+            log.debug("Request details - PatientId: {}, DoctorId: {}", request.getPatientId(), request.getDoctorId());
 
-        // Check if session already exists for this appointment
-        sessionRepository.findByAppointmentId(request.getAppointmentId())
-                .ifPresent(s -> { throw new RuntimeException("Session already exists for this appointment"); });
+            // Validate request
+            if (request.getAppointmentId() == null || request.getAppointmentId().isEmpty()) {
+                log.error("❌ [SessionService] AppointmentId is null or empty");
+                throw new RuntimeException("AppointmentId cannot be null or empty");
+            }
 
-        // Generate a unique room name
-        String roomName = "healthcare-" + UUID.randomUUID().toString().substring(0, 8);
-        String meetingUrl = jitsiBaseUrl + "/" + roomName;
+            // Check if session already exists for this appointment
+            var existingSession = sessionRepository.findByAppointmentId(request.getAppointmentId());
+            if (existingSession.isPresent()) {
+                log.warn("⚠️  [SessionService] Session already exists for this appointment: {}", request.getAppointmentId());
+                throw new RuntimeException("Session already exists for this appointment");
+            }
 
-        VideoSession session = new VideoSession();
-        session.setAppointmentId(request.getAppointmentId());
-        session.setPatientId(request.getPatientId());
-        session.setDoctorId(request.getDoctorId());
-        session.setRoomName(roomName);
-        session.setMeetingUrl(meetingUrl);
-        session.setStatus("CREATED");
-        session.setCreatedAt(LocalDateTime.now());
+            // Generate a unique room name
+            String roomName = "healthcare-" + UUID.randomUUID().toString().substring(0, 8);
+            String meetingUrl = jitsiBaseUrl + "/" + roomName;
 
-        return sessionRepository.save(session);
+            log.info("[SessionService] Generated room name: {}", roomName);
+            log.info("[SessionService] Meeting URL: {}", meetingUrl);
+
+            VideoSession session = new VideoSession();
+            session.setAppointmentId(request.getAppointmentId());
+            session.setPatientId(request.getPatientId());
+            session.setDoctorId(request.getDoctorId());
+            session.setRoomName(roomName);
+            session.setMeetingUrl(meetingUrl);
+            session.setStatus("CREATED");
+            session.setCreatedAt(LocalDateTime.now());
+
+            log.info("[SessionService] VideoSession object created (before save):");
+            log.info("   - AppointmentId: {}", session.getAppointmentId());
+            log.info("   - PatientId: {}", session.getPatientId());
+            log.info("   - DoctorId: {}", session.getDoctorId());
+            log.info("   - RoomName: {}", session.getRoomName());
+            log.info("   - Status: {}", session.getStatus());
+
+            log.info("[SessionService] [BEFORE] Calling sessionRepository.save()...");
+            VideoSession savedSession = sessionRepository.save(session);
+            log.info("[SessionService] [AFTER] Returned from sessionRepository.save()");
+
+            if (savedSession == null) {
+                log.error("❌ [SessionService] sessionRepository.save() returned NULL");
+                throw new RuntimeException("Failed to save VideoSession - repository returned null");
+            }
+
+            log.info("[SessionService] Saved VideoSession details:");
+            log.info("   - ID: {}", savedSession.getId());
+            log.info("   - AppointmentId: {}", savedSession.getAppointmentId());
+            log.info("   - RoomName: {}", savedSession.getRoomName());
+            log.info("   - Status: {}", savedSession.getStatus());
+            
+            log.info("✅ [SessionService] Video session created successfully with ID: {}", savedSession.getId());
+
+            return savedSession;
+        } catch (Exception ex) {
+            log.error("❌ [SessionService] Error creating video session: {}", ex.getMessage(), ex);
+            log.error("   Exception Type: {}", ex.getClass().getName());
+            throw ex;
+        }
+    }
+
+    // ── Activate session by appointment ID (called by doctor Start button) ────
+    public SessionActivateResponse activateSession(String appointmentId) {
+        log.info("🚀 [SessionService] activateSession() called for appointmentId: {}", appointmentId);
+
+        // 1. Find existing session or auto-create one
+        VideoSession session = sessionRepository.findByAppointmentId(appointmentId)
+                .orElseGet(() -> {
+                    log.info("   No session found — auto-creating for appointment: {}", appointmentId);
+                    String roomName  = "healthcare-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+                    String meetingUrl = jitsiBaseUrl + "/" + roomName;
+
+                    VideoSession newSession = new VideoSession();
+                    newSession.setAppointmentId(appointmentId);
+                    newSession.setRoomName(roomName);
+                    newSession.setMeetingUrl(meetingUrl);
+                    newSession.setStatus("CREATED");
+                    newSession.setCreatedAt(LocalDateTime.now());
+                    return newSession;
+                });
+
+        // 2. Activate the session (idempotent — re-activating an already-ACTIVE session is safe)
+        if ("COMPLETED".equals(session.getStatus())) {
+            log.warn("⚠️  [SessionService] Attempted to activate a COMPLETED session: {}", session.getId());
+            throw new RuntimeException("Cannot re-activate a completed session");
+        }
+
+        session.setStatus("ACTIVE");
+        session.setStartedAt(LocalDateTime.now());
+
+        VideoSession saved = sessionRepository.save(session);
+        log.info("✅ [SessionService] Session ACTIVE — id: {}, meetingUrl: {}", saved.getId(), saved.getMeetingUrl());
+
+        return new SessionActivateResponse(
+                saved.getId(),
+                saved.getAppointmentId(),
+                saved.getMeetingUrl(),
+                saved.getStatus()
+        );
     }
 
     // Get session by appointment ID
     public VideoSession getSessionByAppointment(String appointmentId) {
+        log.debug("Fetching session for appointment: {}", appointmentId);
         return sessionRepository.findByAppointmentId(appointmentId)
-                .orElseThrow(() -> new RuntimeException("Session not found"));
+                .orElseThrow(() -> {
+                    log.error("Session not found for appointment: {}", appointmentId);
+                    return new RuntimeException("Session not found");
+                });
     }
 
     // Start the session
     public VideoSession startSession(String sessionId) {
+        log.info("Starting session: {}", sessionId);
         VideoSession session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Session not found"));
+                .orElseThrow(() -> {
+                    log.error("Session not found: {}", sessionId);
+                    return new RuntimeException("Session not found");
+                });
         session.setStatus("ACTIVE");
         session.setStartedAt(LocalDateTime.now());
-        return sessionRepository.save(session);
+        VideoSession updated = sessionRepository.save(session);
+        log.info("✅ Session started: {}", sessionId);
+        return updated;
     }
 
     // End the session
     public VideoSession endSession(String sessionId) {
+        log.info("Ending session: {}", sessionId);
         VideoSession session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Session not found"));
+                .orElseThrow(() -> {
+                    log.error("Session not found: {}", sessionId);
+                    return new RuntimeException("Session not found");
+                });
         session.setStatus("COMPLETED");
         session.setEndedAt(LocalDateTime.now());
-        return sessionRepository.save(session);
+        VideoSession updated = sessionRepository.save(session);
+        log.info("✅ Session ended: {}", sessionId);
+        return updated;
     }
 
     // Get all sessions for a patient
     public List<VideoSession> getPatientSessions(String patientId) {
-        return sessionRepository.findByPatientId(patientId);
+        log.debug("Fetching sessions for patient: {}", patientId);
+        List<VideoSession> sessions = sessionRepository.findByPatientId(patientId);
+        log.info("Found {} sessions for patient: {}", sessions.size(), patientId);
+        return sessions;
     }
 
     // Get all sessions for a doctor
     public List<VideoSession> getDoctorSessions(String doctorId) {
-        return sessionRepository.findByDoctorId(doctorId);
+        log.debug("Fetching sessions for doctor: {}", doctorId);
+        List<VideoSession> sessions = sessionRepository.findByDoctorId(doctorId);
+        log.info("Found {} sessions for doctor: {}", sessions.size(), doctorId);
+        return sessions;
     }
 }
