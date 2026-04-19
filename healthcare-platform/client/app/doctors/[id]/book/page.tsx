@@ -129,13 +129,14 @@ export default function BookAppointmentPage() {
       // Payment is deliberately NOT initiated here. 
       // It will be initiated after the doctor approves the appointment and the patient clicks "Pay Fee" on their dashboard.
 
-      // Send notifications
+      // Send appointment pending notification to the doctor
       try {
         await notificationApi.sendAppointmentConfirmation({
           appointmentId: newAppointmentId,
+          patientId: userId,                   // logged-in patient's ID
           doctorId,
-          email: localStorage.getItem("email"),
-          phone: localStorage.getItem("phone"),
+          type: "APPOINTMENT_PENDING",          // matches backend NotificationType enum
+          additionalMessage: notes || undefined,
         });
       } catch (err) {
         console.warn("Notification failed, but appointment created:", err);

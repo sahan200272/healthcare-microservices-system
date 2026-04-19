@@ -88,51 +88,51 @@ export const telemedicineApi = {
 
 // Appointment API
 export const appointmentApi = {
-  searchDoctors: (params: { specialty?: string; search?: string }) => 
+  searchDoctors: (params: { specialty?: string; search?: string }) =>
     api.get("/api/doctors", { params }),
-  getDoctor: (doctorId: string) => 
+  getDoctor: (doctorId: string) =>
     api.get(`/api/doctors/${doctorId}`),
-  bookAppointment: (appointmentData: any) => 
+  bookAppointment: (appointmentData: any) =>
     api.post("/api/appointments", appointmentData),
-  getAppointments: (userId: string, role: "patient" | "doctor") => 
+  getAppointments: (userId: string, role: "patient" | "doctor") =>
     api.get(`/api/appointments/${role}/${userId}`),
-  updateAppointmentStatus: (appointmentId: string, status: string) => 
+  updateAppointmentStatus: (appointmentId: string, status: string) =>
     api.put(`/api/appointments/${appointmentId}/status`, { status }),
-  confirmAppointment: (appointmentId: string) => 
+  confirmAppointment: (appointmentId: string) =>
     api.put(`/api/appointments/${appointmentId}/confirm`, {}),
-  cancelAppointment: (appointmentId: string) => 
+  cancelAppointment: (appointmentId: string) =>
     api.put(`/api/appointments/${appointmentId}/cancel`, {}),
-  rescheduleAppointment: (appointmentId: string, request: { appointmentDate: string, timeSlot: string }) => 
+  rescheduleAppointment: (appointmentId: string, request: { appointmentDate: string, timeSlot: string }) =>
     api.put(`/api/appointments/${appointmentId}/reschedule`, request),
 };
 
 // Patient API
 export const patientApi = {
-  createProfile: (profileData: any) => 
+  createProfile: (profileData: any) =>
     api.post("/api/patients", profileData),
-  getProfile: (patientId: string) => 
+  getProfile: (patientId: string) =>
     api.get(`/api/patients/${patientId}`),
-  getProfileByUserId: (userId: string) => 
+  getProfileByUserId: (userId: string) =>
     api.get(`/api/patients/by-user/${userId}`),
-  updateProfile: (patientId: string, profileData: any) => 
+  updateProfile: (patientId: string, profileData: any) =>
     api.put(`/api/patients/${patientId}`, profileData),
-  uploadReport: (patientId: string, formData: FormData) => 
+  uploadReport: (patientId: string, formData: FormData) =>
     api.post(`/api/patients/${patientId}/reports`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
-  updateReport: (patientId: string, reportId: string, formData: FormData) => 
+  updateReport: (patientId: string, reportId: string, formData: FormData) =>
     api.put(`/api/patients/${patientId}/reports/${reportId}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
-  getReports: (patientId: string) => 
+  getReports: (patientId: string) =>
     api.get(`/api/patients/${patientId}/reports`),
-  getPrescriptions: (patientId: string) => 
+  getPrescriptions: (patientId: string) =>
     api.get(`/api/patients/${patientId}/prescriptions`),
-  updatePrescriptionNotes: (patientId: string, prescriptionId: string, notes: string) => 
+  updatePrescriptionNotes: (patientId: string, prescriptionId: string, notes: string) =>
     api.put(`/api/patients/${patientId}/prescriptions/${prescriptionId}/notes`, { notes }),
-  getMedicalHistory: (patientId: string) => 
+  getMedicalHistory: (patientId: string) =>
     api.get(`/api/patients/${patientId}/history`),
-  addMedicalHistory: (patientId: string, historyData: any) => 
+  addMedicalHistory: (patientId: string, historyData: any) =>
     api.post(`/api/patients/${patientId}/history`, historyData),
 };
 
@@ -185,39 +185,44 @@ export const doctorApi = {
 
 // Payment API
 export const paymentApi = {
-  createPayment: (paymentData: any) => 
+  createPayment: (paymentData: any) =>
     api.post("/api/payments", paymentData),
-  verifyStripePayment: (sessionId: string) => 
+  verifyStripePayment: (sessionId: string) =>
     api.post(`/api/payments/verify?sessionId=${sessionId}`),
-  getPaymentByAppointmentId: (appointmentId: string) => 
+  getPaymentByAppointmentId: (appointmentId: string) =>
     api.get(`/api/payments/appointment/${appointmentId}`),
-  getPaymentsByPatientId: (patientId: string) => 
+  getPaymentsByPatientId: (patientId: string) =>
     api.get(`/api/payments/patient/${patientId}`),
 };
 
 // Notification API
 export const notificationApi = {
-  sendAppointmentConfirmation: (notificationData: any) => 
-    api.post("/api/notifications/appointment-confirmation", notificationData),
-  sendConsultationReminder: (appointmentId: string) => 
-    api.post(`/api/notifications/consultation-reminder/${appointmentId}`, {}),
-  getNotifications: (userId: string) => 
-    api.get(`/api/notifications/${userId}`),
+  sendNotification: (notificationData: any) =>
+    api.post("/api/notifications/send", notificationData),
+  /** @deprecated use sendNotification instead */
+  sendAppointmentConfirmation: (notificationData: any) =>
+    api.post("/api/notifications/send", notificationData),
+  getNotifications: (userId: string, role: "patient" | "doctor") =>
+    api.get(`/api/notifications/${role}/${userId}`),
+  markAsRead: (id: string) =>
+    api.patch(`/api/notifications/${id}/read`),
+  deleteNotification: (id: string) =>
+    api.delete(`/api/notifications/${id}`),
 };
 
 // Admin API
 export const adminApi = {
-  getDashboardStats: () => 
+  getDashboardStats: () =>
     api.get("/api/admin/dashboard/stats"),
-  getUsers: () => 
+  getUsers: () =>
     api.get("/api/admin/users"),
-  verifyDoctor: (doctorId: string, verificationData: any) => 
+  verifyDoctor: (doctorId: string, verificationData: any) =>
     api.put(`/api/admin/doctors/${doctorId}/verify`, verificationData),
-  rejectDoctor: (doctorId: string, reason: string) => 
+  rejectDoctor: (doctorId: string, reason: string) =>
     api.put(`/api/admin/doctors/${doctorId}/reject`, { reason }),
-  getPendingDoctors: () => 
+  getPendingDoctors: () =>
     api.get("/api/admin/doctors/pending"),
-  getTransactions: () => 
+  getTransactions: () =>
     api.get("/api/admin/transactions"),
 };
 
@@ -237,7 +242,7 @@ export const prescriptionApi = {
 export const aiSymptomApi = {
   analyzeSymptoms: (symptoms: string[]) =>
     api.post("/api/ai/symptom-checker", { symptoms }),
-  getRecommendedSpecialties: (symptoms: string[]) => 
+  getRecommendedSpecialties: (symptoms: string[]) =>
     api.post("/api/ai/recommended-specialties", { symptoms }),
 };
 
