@@ -55,7 +55,7 @@ type SessionState =
 
 function AppointmentCard({ apt, index, onCancel }: AppointmentCardProps) {
   const router = useRouter();
-  const isConfirmed = apt.status === "CONFIRMED" || apt.status === "ACTIVE";
+  const isConfirmed = apt.status === "CONFIRMED" || apt.status === "ACCEPTED" || apt.status === "ACTIVE";
 
   const [sessionState, setSessionState] = useState<SessionState>({ phase: "idle" });
 
@@ -354,7 +354,7 @@ export default function PatientDashboard() {
 
         // Auto-switch tab logic
         const confirmedCount = fetchedAppointments.filter(
-          (a) => a.status === "CONFIRMED" || a.status === "ACTIVE" || a.paid
+          (a) => a.status === "CONFIRMED" || a.status === "ACCEPTED" || a.status === "ACTIVE" || a.paid
         ).length;
         const pendingCount = fetchedAppointments.filter(
           (a) => (a.status === "PENDING" || a.status === "REQUESTED") && !a.paid
@@ -390,7 +390,7 @@ export default function PatientDashboard() {
 
   const filteredAppointments = appointments.filter((apt) => {
     if (activeTab === "pending") return (apt.status === "PENDING" || apt.status === "REQUESTED") && !apt.paid;
-    if (activeTab === "confirmed") return apt.status === "CONFIRMED" || apt.status === "ACTIVE" || apt.paid;
+    if (activeTab === "confirmed") return apt.status === "CONFIRMED" || apt.status === "ACCEPTED" || apt.status === "ACTIVE" || apt.paid;
     if (activeTab === "history") return apt.status === "COMPLETED" || apt.status === "CANCELLED";
     return false;
   });
@@ -444,7 +444,7 @@ export default function PatientDashboard() {
               <h3 className="font-bold text-clinical-dark dark:text-clinical-white">Confirmed</h3>
             </div>
             <p className="text-3xl font-bold text-brand-primary">
-              {appointments.filter((a) => a.status === "CONFIRMED" || a.status === "ACTIVE" || a.paid).length}
+              {appointments.filter((a) => a.status === "CONFIRMED" || a.status === "ACCEPTED" || a.status === "ACTIVE" || a.paid).length}
             </p>
             <p className="text-sm text-clinical-gray">Ready for visitation</p>
           </motion.div>
