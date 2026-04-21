@@ -84,7 +84,7 @@ public class AppointmentService {
                 .build();
 
         Appointment saved = appointmentRepository.save(appointment);
-        log.info("✅ [AppointmentService] Appointment saved to DB with ID: {}", saved.getId());
+        log.info(" [AppointmentService] Appointment saved to DB with ID: {}", saved.getId());
         log.info("   Consultation Type (raw): '{}'", saved.getConsultationType());
 
         // ── Mark the slot as booked in the Doctor Service ─────────────────────────────────
@@ -99,7 +99,7 @@ public class AppointmentService {
 
         // Create video session if this is a video consultation (case-insensitive)
         if ("VIDEO_CONSULTATION".equalsIgnoreCase(saved.getConsultationType())) {
-            log.info("✅ [AppointmentService] CONDITION MATCHED: Creating video session for video consultation appointment");
+            log.info(" [AppointmentService] CONDITION MATCHED: Creating video session for video consultation appointment");
             log.info("   Appointment ID: {}", saved.getId());
             log.info("   Patient ID: {}", saved.getPatientId());
             log.info("   Doctor ID: {}", saved.getDoctorId());
@@ -114,7 +114,7 @@ public class AppointmentService {
                 );
                 log.info("   [AFTER] Returned from telemedicineServiceClient.createVideoSession()");
             } catch (Exception ex) {
-                log.error("❌ [AppointmentService] EXCEPTION while calling telemedicineServiceClient: {}", ex.getMessage());
+                log.error(" [AppointmentService] EXCEPTION while calling telemedicineServiceClient: {}", ex.getMessage());
                 log.error("   Exception Type: {}", ex.getClass().getName());
                 log.error("   Stack Trace: ", ex);
                 sessionResponse = null;
@@ -127,24 +127,24 @@ public class AppointmentService {
             }
             
             if (sessionResponse != null && sessionResponse.getId() != null) {
-                log.info("✅ [AppointmentService] Video session created - linking to appointment");
+                log.info(" [AppointmentService] Video session created - linking to appointment");
                 saved.setVideoSessionId(sessionResponse.getId());
                 try {
                     Appointment updated = appointmentRepository.save(saved);
-                    log.info("✅ [AppointmentService] Appointment updated with videoSessionId: {}", updated.getVideoSessionId());
+                    log.info(" [AppointmentService] Appointment updated with videoSessionId: {}", updated.getVideoSessionId());
                     log.info("   Room Name: {}", sessionResponse.getRoomName());
                     log.info("   Meeting URL: {}", sessionResponse.getMeetingUrl());
                 } catch (Exception ex) {
-                    log.error("❌ [AppointmentService] Failed to save appointment with videoSessionId: {}", ex.getMessage(), ex);
+                    log.error(" [AppointmentService] Failed to save appointment with videoSessionId: {}", ex.getMessage(), ex);
                 }
             } else if (sessionResponse == null) {
-                log.warn("⚠️  [AppointmentService] sessionResponse is NULL - video session creation failed completely");
+                log.warn("  [AppointmentService] sessionResponse is NULL - video session creation failed completely");
             } else {
-                log.warn("⚠️  [AppointmentService] sessionResponse.getId() is NULL - sessionResponse exists but has no ID");
+                log.warn("  [AppointmentService] sessionResponse.getId() is NULL - sessionResponse exists but has no ID");
                 log.warn("   Full Response: {}", sessionResponse);
             }
         } else {
-            log.info("ℹ️ [AppointmentService] CONDITION NOT MATCHED: Appointment type is '{}' (expected 'VIDEO_CONSULTATION'), skipping video session creation", saved.getConsultationType());
+            log.info(" [AppointmentService] CONDITION NOT MATCHED: Appointment type is '{}' (expected 'VIDEO_CONSULTATION'), skipping video session creation", saved.getConsultationType());
         }
 
         notificationServiceClient.sendAppointmentNotification(
@@ -172,7 +172,7 @@ public class AppointmentService {
         try {
             // Guard against null repository (should not happen with Spring DI)
             if (appointmentRepository == null) {
-                log.error("❌ appointmentRepository is null");
+                log.error(" appointmentRepository is null");
                 return Collections.emptyList();
             }
             
@@ -181,22 +181,22 @@ public class AppointmentService {
             
             // Guard against null result (unlikely with Spring Data, but be safe)
             if (appointments == null) {
-                log.warn("⚠️  appointmentRepository.findByPatientId() returned null for patientId: {}", patientId);
+                log.warn("  appointmentRepository.findByPatientId() returned null for patientId: {}", patientId);
                 return Collections.emptyList();
             }
             
-            log.debug("✅ Found {} appointments for patientId: {}", appointments.size(), patientId);
+            log.debug(" Found {} appointments for patientId: {}", appointments.size(), patientId);
             
             // Map to response objects
             List<AppointmentResponse> responses = appointments.stream()
                     .map(this::toResponse)
                     .toList();
             
-            log.info("✅ Converted {} appointments to responses", responses.size());
+            log.info(" Converted {} appointments to responses", responses.size());
             return responses;
             
         } catch (Exception ex) {
-            log.error("❌ Exception while fetching appointments for patientId: {}", patientId, ex);
+            log.error(" Exception while fetching appointments for patientId: {}", patientId, ex);
             throw ex; // Let the global exception handler deal with it
         }
     }
@@ -212,7 +212,7 @@ public class AppointmentService {
 
         try {
             if (appointmentRepository == null) {
-                log.error("❌ appointmentRepository is null");
+                log.error(" appointmentRepository is null");
                 return Collections.emptyList();
             }
             
@@ -220,21 +220,21 @@ public class AppointmentService {
             List<Appointment> appointments = appointmentRepository.findByDoctorId(ownedDoctorId);
             
             if (appointments == null) {
-                log.warn("⚠️  appointmentRepository.findByDoctorId() returned null for doctorId: {}", doctorId);
+                log.warn("  appointmentRepository.findByDoctorId() returned null for doctorId: {}", doctorId);
                 return Collections.emptyList();
             }
             
-            log.debug("✅ Found {} appointments for doctorId: {}", appointments.size(), doctorId);
+            log.debug(" Found {} appointments for doctorId: {}", appointments.size(), doctorId);
             
             List<AppointmentResponse> responses = appointments.stream()
                     .map(this::toResponse)
                     .toList();
             
-            log.info("✅ Converted {} appointments to responses", responses.size());
+            log.info(" Converted {} appointments to responses", responses.size());
             return responses;
             
         } catch (Exception ex) {
-            log.error("❌ Exception while fetching appointments for doctorId: {}", doctorId, ex);
+            log.error(" Exception while fetching appointments for doctorId: {}", doctorId, ex);
             throw ex;
         }
     }
@@ -445,14 +445,14 @@ public class AppointmentService {
 
     private AppointmentResponse toResponse(Appointment a) {
         if (a == null) {
-            log.warn("⚠️  toResponse called with null appointment");
+            log.warn("  toResponse called with null appointment");
             throw new IllegalArgumentException("Appointment cannot be null");
         }
 
         try {
             // Validate critical fields
             if (a.getId() == null) {
-                log.warn("⚠️  Appointment has null ID: {}", a);
+                log.warn("  Appointment has null ID: {}", a);
             }
 
             return AppointmentResponse.builder()
@@ -469,7 +469,7 @@ public class AppointmentService {
                     .updatedAt(a.getUpdatedAt())
                     .build();
         } catch (Exception ex) {
-            log.error("❌ Error converting appointment to response: {}", a, ex);
+            log.error(" Error converting appointment to response: {}", a, ex);
             throw ex;
         }
     }
