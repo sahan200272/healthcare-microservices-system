@@ -14,10 +14,10 @@ public class AppointmentServiceApplication {
 
 		// Load .env file first - try multiple locations
 		Path[] envPaths = {
-			Paths.get(".env"),
-			Paths.get("src/main/resources/.env"),
-			Paths.get("healthcare-platform/services/appointment-service/.env"),
-			Paths.get("healthcare-platform/services/appointment-service/src/main/resources/.env")
+				Paths.get(".env"),
+				Paths.get("src/main/resources/.env"),
+				Paths.get("healthcare-platform/services/appointment-service/.env"),
+				Paths.get("healthcare-platform/services/appointment-service/src/main/resources/.env")
 		};
 
 		Dotenv dotenv = null;
@@ -26,11 +26,11 @@ public class AppointmentServiceApplication {
 				if (Files.exists(envPath)) {
 					System.out.println("Loading .env from: " + envPath.toAbsolutePath());
 					dotenv = Dotenv.configure()
-						.directory(envPath.getParent().toAbsolutePath().toString())
-						.filename(envPath.getFileName().toString())
-						.ignoreIfMissing()
-						.load();
-					
+							.directory(envPath.getParent().toAbsolutePath().toString())
+							.filename(envPath.getFileName().toString())
+							.ignoreIfMissing()
+							.load();
+
 					if (!dotenv.entries().isEmpty()) {
 						break;
 					}
@@ -44,10 +44,12 @@ public class AppointmentServiceApplication {
 		if (dotenv != null && !dotenv.entries().isEmpty()) {
 			dotenv.entries().forEach(entry -> {
 				System.setProperty(entry.getKey(), entry.getValue());
-				System.out.println("Loaded env var: " + entry.getKey() + " = " + (entry.getKey().contains("MONGO") ? "***" : entry.getValue()));
+				System.out.println("Loaded env var: " + entry.getKey() + " = "
+						+ (entry.getKey().contains("MONGO") ? "***" : entry.getValue()));
 			});
 		} else {
-			System.out.println("Warning: No .env file found. Relying on system environment variables or application.properties defaults.");
+			System.out.println(
+					"Warning: No .env file found. Relying on system environment variables or application.properties defaults.");
 		}
 
 		SpringApplication.run(AppointmentServiceApplication.class, args);

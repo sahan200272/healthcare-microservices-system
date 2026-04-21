@@ -5,6 +5,7 @@ import { Activity, User, LogOut, LayoutDashboard, Stethoscope, FileText, Setting
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { notificationApi } from "@/lib/api";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -14,6 +15,7 @@ export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // True when on any /doctor/* route — navbar must always be solid here
   const isDoctorRoute = pathname.startsWith("/doctor");
@@ -33,6 +35,30 @@ export default function Navbar() {
       setUserEmail(localStorage.getItem("email"));
     }
   }, []);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      const authUserId = typeof window !== "undefined" ? localStorage.getItem("id") : null;
+      if (authUserId && role && (role === "PATIENT" || role === "DOCTOR")) {
+        try {
+          const response = await notificationApi.getNotifications(
+            authUserId,
+            role.toLowerCase() as "patient" | "doctor"
+          );
+          const unread = response.data.filter((n: any) => !n.isRead).length;
+          setUnreadCount(unread);
+        } catch (error) {
+          console.error("Failed to fetch notifications count:", error);
+        }
+      }
+    };
+
+    if (role) {
+      fetchUnreadCount();
+      const interval = setInterval(fetchUnreadCount, 30000); // Poll every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [role]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -115,7 +141,12 @@ export default function Navbar() {
                   pathname.startsWith(link.href) ? "text-brand-primary" : "text-clinical-gray"
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <div className="relative">
+                  <Icon className="w-4 h-4" />
+                  {link.label === "Notifications" && unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-slate-900 animate-pulse" />
+                  )}
+                </div>
                 <span>{link.label}</span>
               </Link>
             );
